@@ -1,5 +1,8 @@
 import resolve from '@rollup/plugin-node-resolve';
 import commonjs from '@rollup/plugin-commonjs';
+import terser from '@rollup/plugin-terser';
+
+const shouldMinify = !process.env.ROLLUP_WATCH;
 
 export default [
   // Main entry
@@ -28,8 +31,9 @@ export default [
       resolve({
         browser: true
       }),
-      commonjs()
-    ],
+      commonjs(),
+      shouldMinify ? terser() : null
+    ].filter(Boolean),
     external: ['cesium']
   },
   // Vue entry
@@ -51,8 +55,9 @@ export default [
       resolve({
         browser: true
       }),
-      commonjs()
-    ],
+      commonjs(),
+      shouldMinify ? terser() : null
+    ].filter(Boolean),
     external: ['cesium']
   }
 ];

@@ -6,6 +6,29 @@
 import { Billboard } from './billboard.js';
 import pointsManager from '../core/manager.js';
 
+function resolveImageInput(input) {
+  if (input == null) return null;
+  if (typeof input === 'string') return input;
+  if (typeof URL !== 'undefined' && input instanceof URL) return input.toString();
+  if (typeof input === 'object') {
+    if (typeof input.value !== 'undefined') return resolveImageInput(input.value);
+    if (typeof input.default === 'string') return input.default;
+    if (typeof input.href === 'string') return input.href;
+    if (typeof input.src === 'string') return input.src;
+  }
+  return input;
+}
+
+function hasValidImageInput(input) {
+  const v = resolveImageInput(input);
+  if (v == null) return false;
+  if (typeof v === 'string') return v.trim().length > 0;
+  return true;
+}
+
+const TRANSPARENT_1PX_PNG =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+K8ZcAAAAASUVORK5CYII=';
+
 /**
  * Add a billboard (Cesium billboard entity)
  * @param {Object} pluginInstance
@@ -25,7 +48,8 @@ export function addBillboard(pluginInstance, options = {}) {
   const Cesium = pluginInstance.getCesium();
   const heightOffset = typeof options.heightOffset === 'number' ? options.heightOffset : 0;
 
-  if (Array.isArray(options)) {
+  const isPositionArrayInput = Array.isArray(options);
+  if (isPositionArrayInput) {
     options = { position: options };
   }
 
@@ -33,8 +57,11 @@ export function addBillboard(pluginInstance, options = {}) {
     throw new Error('Position is required and must be [longitude, latitude, height]');
   }
   
-  // 必须提供图片
-  if (!options.imageUrl) {
+  const inputImage = options.imageUrl !== undefined ? options.imageUrl : options.image;
+  const resolvedImage = hasValidImageInput(inputImage)
+    ? resolveImageInput(inputImage)
+    : (isPositionArrayInput ? TRANSPARENT_1PX_PNG : null);
+  if (!hasValidImageInput(resolvedImage)) {
     throw new Error('imageUrl is required for billboard');
   }
 
@@ -50,6 +77,7 @@ export function addBillboard(pluginInstance, options = {}) {
   // Create Billboard instance
   const billboard = new Billboard(id, {
     ...options,
+    imageUrl: resolvedImage,
     cesium: Cesium
   });
 
@@ -156,8 +184,8 @@ export function addMultipleBillboards(pluginInstance, list = [], shared = {}) {
     delete merged.on;
     delete merged.events;
     
-    // 如果没有 imageUrl，无法创建
-    if (!merged.imageUrl) {
+    const mergedImage = merged.imageUrl !== undefined ? merged.imageUrl : merged.image;
+    if (!hasValidImageInput(mergedImage)) {
       console.warn('Skipping billboard creation: imageUrl is missing', merged);
       continue;
     }

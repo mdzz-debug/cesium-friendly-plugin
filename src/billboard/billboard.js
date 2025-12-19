@@ -1,5 +1,18 @@
 import pointsManager from '../core/manager.js';
 
+function resolveImageInput(input) {
+  if (input == null) return null;
+  if (typeof input === 'string') return input;
+  if (typeof URL !== 'undefined' && input instanceof URL) return input.toString();
+  if (typeof input === 'object') {
+    if (typeof input.value !== 'undefined') return resolveImageInput(input.value);
+    if (typeof input.default === 'string') return input.default;
+    if (typeof input.href === 'string') return input.href;
+    if (typeof input.src === 'string') return input.src;
+  }
+  return input;
+}
+
 export class Billboard {
   constructor(id, options = {}) {
     this.id = id;
@@ -13,7 +26,7 @@ export class Billboard {
     this.color = options.color || '#FFFFFF'; // 默认白色，不影响图片颜色
     this.scale = options.scale != null ? options.scale : 1.0;
     this.rotation = options.rotation || 0; // 角度
-    this.imageUrl = options.imageUrl || '';
+    this.imageUrl = resolveImageInput(options.imageUrl) || '';
     this.draggable = options.draggable || false;
     this.heightOffset = options.heightOffset || 0;
     this.heightReference = options.heightReference || 'clampToGround';
@@ -76,9 +89,10 @@ export class Billboard {
   // --- Billboard Specific Methods ---
 
   setImage(url) {
-    this.imageUrl = url;
+    const resolved = resolveImageInput(url);
+    this.imageUrl = resolved;
     if (this.entity && this.entity.billboard) {
-      this.entity.billboard.image = url;
+      this.entity.billboard.image = resolved;
     }
     return this;
   }

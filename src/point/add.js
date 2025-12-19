@@ -6,6 +6,26 @@
 import { Point } from './point.js';
 import pointsManager from '../core/manager.js';
 
+function resolveImageInput(input) {
+  if (input == null) return null;
+  if (typeof input === 'string') return input;
+  if (typeof URL !== 'undefined' && input instanceof URL) return input.toString();
+  if (typeof input === 'object') {
+    if (typeof input.value !== 'undefined') return resolveImageInput(input.value);
+    if (typeof input.default === 'string') return input.default;
+    if (typeof input.href === 'string') return input.href;
+    if (typeof input.src === 'string') return input.src;
+  }
+  return input;
+}
+
+function hasValidImageInput(input) {
+  const v = resolveImageInput(input);
+  if (v == null) return false;
+  if (typeof v === 'string') return v.trim().length > 0;
+  return true;
+}
+
 /**
  * Add a point (Cesium point entity, screen-pixel sized)
  * @param {Object} pluginInstance
@@ -50,6 +70,9 @@ export function addPoint(pluginInstance, options = {}) {
     ...options,
     cesium: Cesium // Pass Cesium object for color operations
   });
+  if (point.imageUrl !== null && point.imageUrl !== undefined) {
+    point.imageUrl = resolveImageInput(point.imageUrl);
+  }
 
   // Create Cesium entity
   const entityOptions = {
@@ -100,7 +123,7 @@ export function addPoint(pluginInstance, options = {}) {
       : (point.position[2] || 0);
 
   // 根据是否有 imageUrl 决定创建点或图片点
-  const isImage = !!point.imageUrl;
+  const isImage = hasValidImageInput(point.imageUrl);
   if (isImage) {
     entityOptions.position = Cesium.Cartesian3.fromDegrees(
       point.position[0],
@@ -108,7 +131,7 @@ export function addPoint(pluginInstance, options = {}) {
       heightValue
     );
     entityOptions.billboard = {
-      image: point.imageUrl,
+      image: resolveImageInput(point.imageUrl),
       heightReference
     };
     if (options.width != null) {
