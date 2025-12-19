@@ -1,5 +1,6 @@
-import pointsManager from './point/manager.js';
+import pointsManager from './core/manager.js';
 import { addPoint, addMultiple } from './point/add.js';
+import { addBillboard, addMultipleBillboards } from './billboard/add.js';
 
 const pluginInstance = {
   version: '1.0.0',
@@ -20,15 +21,40 @@ pluginInstance.getViewer = function() {
   return this._viewer;
 };
 
+// Common Entity Management API (Promoted to top-level)
+pluginInstance.get = (id) => pointsManager.getPoint(id);
+pluginInstance.getAll = () => pointsManager.getAllPoints();
+pluginInstance.remove = (idOrPoint) => pointsManager.removePoint(idOrPoint);
+pluginInstance.removeAll = () => pointsManager.removeAllPoints();
+pluginInstance.removeGroup = (groupName) => pointsManager.removeGroup(groupName);
+pluginInstance.updatePosition = (id, position) => pointsManager.updatePointPosition(id, position);
+pluginInstance.select = (idOrPoint) => {
+    const point = typeof idOrPoint === 'string' ? pointsManager.getPoint(idOrPoint) : idOrPoint;
+    if (point) pointsManager.select(point);
+};
+pluginInstance.deselect = () => pointsManager.deselect();
+pluginInstance.getSelected = () => pointsManager.getSelectedPoint();
+
 pluginInstance.point = {
   add: (options) => addPoint(pluginInstance, options),
   addMultiple: (list, shared) => addMultiple(pluginInstance, list, shared),
-  get: (id) => pointsManager.getPoint(id),
-  getAll: () => pointsManager.getAllPoints(),
-  remove: (idOrPoint) => pointsManager.removePoint(idOrPoint), // 支持 id 或 point 对象
-  removeAll: () => pointsManager.removeAllPoints(),
-  updatePosition: (id, position) => pointsManager.updatePointPosition(id, position),
-  removeGroup: (groupName) => pointsManager.removeGroup(groupName)
+  get: (id) => pointsManager.getByType(id, 'point'),
+  getAll: () => pointsManager.getAllByType('point'),
+  remove: (idOrPoint) => pointsManager.removePoint(idOrPoint, 'point'), // 仅移除点位类型
+  removeAll: () => pointsManager.removeAllPoints('point'),
+  updatePosition: (id, position) => pointsManager.updatePointPosition(id, position, 'point'),
+  removeGroup: (groupName) => pointsManager.removeGroup(groupName, 'point')
+};
+
+pluginInstance.billboard = {
+  add: (options) => addBillboard(pluginInstance, options),
+  addMultiple: (list, shared) => addMultipleBillboards(pluginInstance, list, shared),
+  get: (id) => pointsManager.getByType(id, 'billboard'),
+  getAll: () => pointsManager.getAllByType('billboard'),
+  remove: (idOrPoint) => pointsManager.removePoint(idOrPoint, 'billboard'),
+  removeAll: () => pointsManager.removeAllPoints('billboard'),
+  updatePosition: (id, position) => pointsManager.updatePointPosition(id, position, 'billboard'),
+  removeGroup: (groupName) => pointsManager.removeGroup(groupName, 'billboard')
 };
 
 // Export for ES6 modules

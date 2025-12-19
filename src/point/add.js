@@ -4,7 +4,7 @@
  */
 
 import { Point } from './point.js';
-import pointsManager from './manager.js';
+import pointsManager from '../core/manager.js';
 
 /**
  * Add a point (Cesium point entity, screen-pixel sized)
@@ -35,7 +35,7 @@ export function addPoint(pluginInstance, options = {}) {
     throw new Error('Position is required and must be [longitude, latitude, height]');
   }
 
-  pointsManager.removeDuplicatesAtPosition(options.position, options.group);
+  // pointsManager.removeDuplicatesAtPosition(options.position, options.group);
 
   // Generate ID if not provided
   const id = options.id || `point-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
@@ -61,7 +61,22 @@ export function addPoint(pluginInstance, options = {}) {
 
   // 转换高度参考配置
   let heightReference;
-  switch (point.heightReference) {
+  // 智能推断 heightReference
+  // 如果用户显式提供了 heightOffset 且 > 0，但未提供 heightReference，则自动设为 RELATIVE_TO_GROUND
+  // 如果用户显式设置了 heightReference，则以用户设置为准
+  const userHasHeightOffset = typeof options.heightOffset === 'number' && options.heightOffset > 0;
+  const userHasHeightRef = options.heightReference !== undefined;
+
+  let targetHr = point.heightReference;
+  if (userHasHeightOffset && !userHasHeightRef) {
+    targetHr = 'relativeToGround';
+    // 同步更新实例状态
+    point.heightReference = 'relativeToGround';
+  } else if (userHasHeightRef) {
+    targetHr = point.heightReference;
+  }
+
+  switch (targetHr) {
     case 'none':
       heightReference = Cesium.HeightReference.NONE;
       break;
@@ -73,8 +88,11 @@ export function addPoint(pluginInstance, options = {}) {
       heightReference = Cesium.HeightReference.CLAMP_TO_GROUND;
       break;
   }
+  
+  // 双重保险：如果是 clampToGround 但又有高度偏移，强制转为 relativeToGround
   if (heightReference === Cesium.HeightReference.CLAMP_TO_GROUND && heightOffset > 0) {
     heightReference = Cesium.HeightReference.RELATIVE_TO_GROUND;
+    point.heightReference = 'relativeToGround';
   }
   const heightValue =
     heightReference === Cesium.HeightReference.RELATIVE_TO_GROUND
@@ -135,6 +153,19 @@ export function addPoint(pluginInstance, options = {}) {
   }
 
   pointsManager.registerPoint(point, options);
+
+  // Bind events if provided in options
+  if (options.on && typeof options.on === 'object') {
+    for (const eventName in options.on) {
+      if (typeof options.on[eventName] === 'function') {
+        point.on(eventName, options.on[eventName]);
+      }
+    }
+  }
+  // Support options.onClick shorthand
+  if (typeof options.onClick === 'function') {
+    point.on('click', options.onClick);
+  }
 
   return point;
 }

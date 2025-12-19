@@ -1,18 +1,19 @@
 import pointsManager from '../core/manager.js';
 
-export class Point {
+export class Billboard {
   constructor(id, options = {}) {
     this.id = id;
-    this.type = 'point';
+    this.type = 'billboard';
     this.position = options.position || [0, 0, 0];
     this.name = options.name || '';
     this.description = options.description || '';
     this.info = options.info || {};
     this.entity = null;
     this.cesium = options.cesium || null;
-    this.color = options.color || '#FF0000';
-    this.pixelSize = options.pixelSize || 10;
-    this.imageUrl = options.imageUrl || null;
+    this.color = options.color || '#FFFFFF'; // 默认白色，不影响图片颜色
+    this.scale = options.scale != null ? options.scale : 1.0;
+    this.rotation = options.rotation || 0; // 角度
+    this.imageUrl = options.imageUrl || '';
     this.draggable = options.draggable || false;
     this.heightOffset = options.heightOffset || 0;
     this.heightReference = options.heightReference || 'clampToGround';
@@ -22,10 +23,16 @@ export class Point {
     this._flashTimer = null;
     this._flashing = false;
     this._hidden = false;
-    this._savedState = null;
   }
   setEntity(entity) {
     this.entity = entity;
+    // 初始化属性
+    if (this.entity && this.entity.billboard) {
+      this.entity.billboard.image = this.imageUrl;
+      this.entity.billboard.scale = this.scale;
+      this.entity.billboard.rotation = this.cesium.Math.toRadians(this.rotation);
+      this.setOpacity(this.opacity);
+    }
     return this;
   }
   getEntity() {
@@ -58,53 +65,63 @@ export class Point {
   }
   updatePosition(position) {
     this.position = position;
+    if (this.entity) {
+      const isRelative = this.heightReference === 'relativeToGround' || this.heightOffset > 0;
+      const h = isRelative ? (this.heightOffset || 0) : (position[2] || 0);
+      this.entity.position = this.cesium.Cartesian3.fromDegrees(position[0], position[1], h);
+    }
     return this;
   }
+  
+  // --- Billboard Specific Methods ---
+
+  setImage(url) {
+    this.imageUrl = url;
+    if (this.entity && this.entity.billboard) {
+      this.entity.billboard.image = url;
+    }
+    return this;
+  }
+
+  setScale(scale) {
+    this.scale = scale;
+    if (this.entity && this.entity.billboard) {
+      this.entity.billboard.scale = scale;
+    }
+    return this;
+  }
+
+  setRotation(degree) {
+    this.rotation = degree;
+    if (this.entity && this.entity.billboard) {
+      this.entity.billboard.rotation = this.cesium.Math.toRadians(degree);
+    }
+    return this;
+  }
+
   setDraggable(enable) {
     this.draggable = !!enable;
     return this;
   }
+
   setColor(color) {
     this.color = color;
-    if (this.entity && this.entity.point) {
-      this.entity.point.color = this.cesium.Color.fromCssColorString(color).withAlpha(this.opacity);
-    }
     if (this.entity && this.entity.billboard) {
       const col = this.cesium.Color.fromCssColorString(color).withAlpha(this.opacity);
       this.entity.billboard.color = col;
     }
     return this;
   }
-  setPixelSize(size) {
-    this.pixelSize = size;
-    if (this.entity && this.entity.point) {
-      this.entity.point.pixelSize = size;
-    }
-    return this;
-  }
-  setIcon(url) {
-    // 暂时清空，后续单独封装广告牌逻辑
-    return this;
-  }
+
   setOpacity(alpha) {
     this.opacity = alpha;
-    if (this.entity && this.entity.point) {
-      const c = this.cesium.Color.fromCssColorString(this.color).withAlpha(alpha);
-      this.entity.point.color = c;
-    }
     if (this.entity && this.entity.billboard) {
       const c = this.cesium.Color.fromCssColorString(this.color).withAlpha(alpha);
       this.entity.billboard.color = c;
     }
     return this;
   }
-  setOutline(enable, color, width) {
-    if (this.entity && this.entity.point) {
-      this.entity.point.outlineWidth = enable ? (width || 2) : 0;
-      this.entity.point.outlineColor = enable ? this.cesium.Color.fromCssColorString(color || '#FFFFFF') : this.cesium.Color.TRANSPARENT;
-    }
-    return this;
-  }
+
   show() {
     this._hidden = false;
     if (this.entity) this.entity.show = true;
@@ -117,35 +134,44 @@ export class Point {
   }
   setClampToGround(clamp = true) {
     this.heightReference = clamp ? 'clampToGround' : 'none';
-    if (this.entity && (this.entity.point || this.entity.billboard)) {
+    if (this.entity && this.entity.billboard) {
       const hr = clamp ? this.cesium.HeightReference.CLAMP_TO_GROUND : this.cesium.HeightReference.NONE;
-      if (this.entity.point) this.entity.point.heightReference = hr;
-      if (this.entity.billboard) this.entity.billboard.heightReference = hr;
+      this.entity.billboard.heightReference = hr;
     }
     return this;
   }
   setHeight(height) {
     this.heightOffset = height || 0;
-
-    // Auto update heightReference state
-    if (this.heightOffset > 0 && this.heightReference === 'clampToGround') {
-      this.heightReference = 'relativeToGround';
+    
+    // 根据高度自动判断参考系
+    const isRelative = this.heightOffset > 0;
+    // 如果有高度偏移，强制使用 RELATIVE_TO_GROUND，否则回退到默认的 heightReference (通常是 clampToGround)
+    // 但如果用户显式设置了 'none'，则保持 'none'
+    let targetHr = this.heightReference;
+    
+    if (this.heightReference === 'clampToGround' && isRelative) {
+        targetHr = 'relativeToGround';
+    } else if (this.heightReference === 'relativeToGround' && !isRelative) {
+        // 如果高度归零，且原本是 relative，是否要切回 clamp？
+        // 保持 relative 也没问题，只是高度为 0
     }
+
+    // Update internal state
+    this.heightReference = targetHr;
 
     if (this.entity) {
       const Cesium = this.cesium;
-      const isRelative = this.heightReference === 'relativeToGround';
-      const hr = isRelative ? Cesium.HeightReference.RELATIVE_TO_GROUND
-        : (this.heightReference === 'none' ? Cesium.HeightReference.NONE : Cesium.HeightReference.CLAMP_TO_GROUND);
-      if (this.entity.point) {
-        this.entity.point.heightReference = hr;
-      }
+      const cesHr = targetHr === 'relativeToGround' ? Cesium.HeightReference.RELATIVE_TO_GROUND
+        : (targetHr === 'clampToGround' ? Cesium.HeightReference.CLAMP_TO_GROUND : Cesium.HeightReference.NONE);
+      
       if (this.entity.billboard) {
-        this.entity.billboard.heightReference = hr;
+        this.entity.billboard.heightReference = cesHr;
       }
-      const h = isRelative ? this.heightOffset : (this.position[2] || 0);
+      
+      // 计算新的位置坐标
+      const h = (targetHr === 'relativeToGround') ? this.heightOffset : (this.position[2] || 0);
       this.entity.position = Cesium.Cartesian3.fromDegrees(this.position[0], this.position[1], h);
-
+      
       // 更新内部位置数据的 Z 值，保持同步
       if (this.position && this.position.length >= 2) {
          this.position = [this.position[0], this.position[1], h];
@@ -175,8 +201,10 @@ export class Point {
       description: this.description,
       position: this.position,
       color: this.color,
-      pixelSize: this.pixelSize,
+      scale: this.scale,
+      rotation: this.rotation,
       imageUrl: this.imageUrl,
+      draggable: this.draggable,
       opacity: this.opacity,
       group: this.group,
       heightReference: this.heightReference,
@@ -250,8 +278,10 @@ export class Point {
 
   saveState() {
     this._savedState = {
+      scale: this.scale,
+      rotation: this.rotation,
+      imageUrl: this.imageUrl,
       color: this.color,
-      pixelSize: this.pixelSize,
       opacity: this.opacity
     };
     return this;
@@ -259,8 +289,10 @@ export class Point {
 
   restoreState() {
     if (this._savedState) {
+      this.setScale(this._savedState.scale);
+      this.setRotation(this._savedState.rotation);
+      this.setImage(this._savedState.imageUrl);
       this.setColor(this._savedState.color);
-      this.setPixelSize(this._savedState.pixelSize);
       this.setOpacity(this._savedState.opacity);
       this._savedState = null;
     }
