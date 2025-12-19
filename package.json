@@ -1,0 +1,58 @@
+{
+  "name": "cesium-friendly-plugin",
+  "version": "1.0.0",
+  "description": "A friendly plugin for Cesium integration methods, providing convenient utilities and helpers",
+  "main": "dist/index.js",
+  "module": "dist/index.esm.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.esm.js",
+      "require": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./vue": {
+      "import": "./dist/vue.esm.js",
+      "require": "./dist/vue.js",
+      "default": "./dist/vue.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "rollup -c",
+    "dev": "rollup -c -w",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "cesium",
+    "3d",
+    "globe",
+    "map",
+    "plugin",
+    "integration"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mdzz-debug/cesium-friendly-plugin.git"
+  },
+  "bugs": {
+    "url": "https://github.com/mdzz-debug/cesium-friendly-plugin/issues"
+  },
+  "homepage": "https://github.com/mdzz-debug/cesium-friendly-plugin#readme",
+  "author": "mdzz-debug",
+  "license": "MIT",
+  "peerDependencies": {
+    "cesium": "^1.100.0"
+  },
+  "devDependencies": {
+    "@rollup/plugin-commonjs": "^25.0.7",
+    "@rollup/plugin-node-resolve": "^15.2.3",
+    "@rollup/plugin-typescript": "^11.1.5",
+    "rollup": "^4.9.0",
+    "typescript": "^5.3.3"
+  }
+}
+
