@@ -42,6 +42,8 @@ cf.billboard.add({
 | `heightReference` | String | 否 | `clampToGround` | 高度模式 (`none`, `clampToGround`, `relativeToGround`)。若设置了 `heightOffset`，默认为 `relativeToGround`。 |
 | `heightOffset` | Number | 否 | `0` | 相对地面的高度偏移量 |
 | `group` | String | 否 | - | 分组名称 |
+| `ttlMs` | Number | 否 | - | 生存时间(毫秒)，过期自动销毁 |
+| `expiresAt` | Number | 否 | - | 过期时间戳（支持秒或毫秒），到达该时间点自动销毁 |
 | `id` | String | 否 | 随机生成 | 指定唯一 ID |
 | `name` | String | 否 | - | 名称 |
 | `description` | String | 否 | - | 描述 |
@@ -115,6 +117,8 @@ cf.billboard.addMultiple(
 - `setDraggable(enable)`: 开启/关闭拖拽。
 - `setClampToGround(enable)`: 设置是否贴地 (true: 贴地, false: 绝对高度)。
 - `setHeight(height)`: 设置相对地面的高度（会自动切换为 `relativeToGround` 模式）。
+- `setTTL(ms)`: 设置生存时间（毫秒），过期自动销毁。
+- `setExpiresAt(timestamp)`: 设置绝对过期时间点（时间戳）。
 - `setGroup(name)`: 修改分组。
 - `setInfo(info)`: 更新元数据 (`name`, `description`, 自定义 `data`)。
 - `show() / hide()`: 显示/隐藏。

@@ -391,17 +391,24 @@ class PointsManager {
       expiresAt *= 1000;
     }
 
+    const ttlMs = options.ttlMs;
     if (typeof ttlMs === 'number' && ttlMs > 0) {
       const timer = setTimeout(() => {
         this.removePoint(point.id);
       }, ttlMs);
       this.ttlTimers.set(point.id, timer);
-    } else if (typeof expiresAt === 'number' && expiresAt > Date.now()) {
-      const delay = expiresAt - Date.now();
-      const timer = setTimeout(() => {
+    } else if (typeof expiresAt === 'number') {
+      if (expiresAt > Date.now()) {
+        const delay = expiresAt - Date.now();
+        const timer = setTimeout(() => {
+          this.removePoint(point.id);
+        }, delay);
+        this.ttlTimers.set(point.id, timer);
+      } else {
+        // 已过期，立即移除
+        console.warn(`Point ${point.id} is expired (expiresAt: ${expiresAt}), removing immediately.`);
         this.removePoint(point.id);
-      }, delay);
-      this.ttlTimers.set(point.id, timer);
+      }
     }
   }
 
@@ -545,6 +552,22 @@ class PointsManager {
         this.groups.set(newGroup, new Set());
       }
       this.groups.get(newGroup).add(point.id);
+    }
+  }
+
+  updateTTL(id, ms) {
+    // Clear existing timer
+    const oldTimer = this.ttlTimers.get(id);
+    if (oldTimer) {
+      clearTimeout(oldTimer);
+      this.ttlTimers.delete(id);
+    }
+
+    if (ms && ms > 0) {
+      const timer = setTimeout(() => {
+        this.removePoint(id);
+      }, ms);
+      this.ttlTimers.set(id, timer);
     }
   }
 

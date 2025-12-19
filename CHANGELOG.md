@@ -23,6 +23,9 @@
     - `cf.point.*` 方法（如 remove, getAll）现在仅对点位生效，不再影响广告牌。
     - `cf.billboard.*` 方法同理，仅对广告牌生效。
     - 引入 **全局 API** (`cf.get`, `cf.getAll`, `cf.remove`) 用于跨类型的混合操作。
+  - **通用能力增强**：
+    - 新增 `setTTL(ms)` 链式方法，支持动态设置点位或广告牌的生存时间。
+    - 新增 `setExpiresAt(timestamp)` 链式方法及 `expiresAt` 配置项，支持设置绝对过期时间（过期自动销毁，若已过期则立即移除）。
 
 ### 修复 (Fixed)
 - 修复拖拽过程中坐标包含多余 0 的问题。

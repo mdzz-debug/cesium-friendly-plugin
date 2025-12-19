@@ -219,6 +219,25 @@ export class Billboard {
     pointsManager.removeDuplicatesAtPosition(this.position, this.group, this.id);
     return this;
   }
+  setTTL(ms) {
+    pointsManager.updateTTL(this.id, ms);
+    return this;
+  }
+  setExpiresAt(timestamp) {
+    if (typeof timestamp === 'number') {
+      if (timestamp < 10000000000) {
+        timestamp *= 1000;
+      }
+      const ttl = timestamp - Date.now();
+      if (ttl <= 0) {
+        console.warn(`Billboard ${this.id} expired immediately.`);
+        pointsManager.removePoint(this.id);
+      } else {
+        pointsManager.updateTTL(this.id, ttl);
+      }
+    }
+    return this;
+  }
   setFlash(enable, duration, options = {}) {
     // 兼容旧签名：setFlash(enable, options)
     if (typeof duration === 'object' && duration !== null) {

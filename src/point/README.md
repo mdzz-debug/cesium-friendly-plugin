@@ -40,6 +40,7 @@ const p = cf.point.add([116.3974, 39.9093])
 | `heightOffset` | Number | 否 | `0` | 相对地面的高度偏移量 |
 | `group` | String | 否 | - | 分组名称 |
 | `ttlMs` | Number | 否 | - | 生存时间(毫秒)，过期自动销毁 |
+| `expiresAt` | Number | 否 | - | 过期时间戳（支持秒或毫秒），到达该时间点自动销毁 |
 | `id` | String | 否 | 随机生成 | 指定唯一 ID |
 | `name` | String | 否 | - | 名称 |
 | `description` | String | 否 | - | 描述 |
@@ -87,6 +88,8 @@ cf.point.addMultiple(
 - `setDraggable(enable)`: **[新增]** 开启/关闭拖拽。
 - `setHeight(height)`: 设置离地高度（自动转为相对高度模式）。
 - `setClampToGround(bool)`: 设置是否贴地。
+- `setTTL(ms)`: 设置生存时间（毫秒），过期自动销毁。
+- `setExpiresAt(timestamp)`: 设置绝对过期时间点（时间戳）。
 - `setFlash(enable, duration, options)`: 开启/关闭闪烁。
 - `setInfo(info)`: 更新绑定的业务数据。
 - `show() / hide()`: 显示/隐藏。
@@ -117,8 +120,14 @@ p.on('dragend', (point) => {
 支持设置有效期，到期自动移除：
 
 ```javascript
+// 方式 1: 配置项
 cf.point.add({
   position: [116.5, 39.5],
   ttlMs: 5000 // 5秒后自动消失
 });
+
+// 方式 2: 链式调用
+cf.point.add([116.6, 39.6])
+  .setColor('blue')
+  .setTTL(3000); // 3秒后消失
 ```
