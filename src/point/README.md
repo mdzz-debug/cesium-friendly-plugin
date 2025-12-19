@@ -97,6 +97,13 @@ cf.point.addMultiple(
 
 ## 事件系统
 
+### 绑定与解绑
+
+- `on(type, handler)`: 绑定事件。
+- `off(type, handler)`: 解绑事件。
+
+### 事件类型
+
 支持 `click`, `hover`, `select`, `unselect`, `dragstart`, `drag`, `dragend`。
 
 - **Select/Unselect**: 
