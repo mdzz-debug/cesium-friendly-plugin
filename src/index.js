@@ -1,4 +1,5 @@
 import pointsManager from './core/manager.js';
+import debuggerManager from './debugger/index.js';
 import { addPoint, addMultiple } from './point/add.js';
 import { addBillboard, addMultipleBillboards } from './billboard/add.js';
 
@@ -8,10 +9,16 @@ const pluginInstance = {
   _viewer: null
 };
 
-pluginInstance.init = function(cesium, viewer) {
+pluginInstance.init = function(cesium, viewer, options = {}) {
   this._cesium = cesium;
   this._viewer = viewer;
   pointsManager.init(cesium, viewer);
+  
+  if (options && options.debug) {
+    debuggerManager.init();
+    debuggerManager.enable();
+  }
+
   return { cesium, viewer };
 };
 pluginInstance.getCesium = function() {

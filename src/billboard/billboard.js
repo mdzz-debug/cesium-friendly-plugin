@@ -183,7 +183,7 @@ export class Billboard {
       }
       
       // 计算新的位置坐标
-      const h = (targetHr === 'relativeToGround') ? this.heightOffset : (this.position[2] || 0);
+      const h = this.heightOffset;
       this.entity.position = Cesium.Cartesian3.fromDegrees(this.position[0], this.position[1], h);
       
       // 更新内部位置数据的 Z 值，保持同步

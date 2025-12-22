@@ -105,6 +105,7 @@ export class Point {
     }
     return this;
   }
+
   show() {
     this._hidden = false;
     if (this.entity) this.entity.show = true;
@@ -143,7 +144,7 @@ export class Point {
       if (this.entity.billboard) {
         this.entity.billboard.heightReference = hr;
       }
-      const h = isRelative ? this.heightOffset : (this.position[2] || 0);
+      const h = this.heightOffset;
       this.entity.position = Cesium.Cartesian3.fromDegrees(this.position[0], this.position[1], h);
 
       // 更新内部位置数据的 Z 值，保持同步

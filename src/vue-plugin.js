@@ -43,7 +43,7 @@ const VuePlugin = {
 
     // Auto initialize if cesium and viewer are provided
     if (options.cesium && options.viewer) {
-      CesiumFriendlyPlugin.init(options.cesium, options.viewer);
+      CesiumFriendlyPlugin.init(options.cesium, options.viewer, options);
     }
   }
 };

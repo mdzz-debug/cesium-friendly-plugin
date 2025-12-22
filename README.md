@@ -1,7 +1,7 @@
 # Cesium Friendly Plugin
 
 ![Version](https://img.shields.io/badge/version-1.0.1-blue.svg)
-[![GitHub](https://img.shields.io/badge/GitHub-Repo-black?logo=github)](https://github.com/mdzz-debug/cesium-friendly-plugin)
+<!-- [![GitHub](https://img.shields.io/badge/GitHub-Repo-black?logo=github)](https://github.com/mdzz-debug/cesium-friendly-plugin) -->
 
 Cesium 开发伴侣，提供一套友好的链式调用 API，简化 Cesium 原生繁琐的实体管理、事件绑定和交互逻辑。
 

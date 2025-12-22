@@ -17,6 +17,44 @@ class PointsManager {
     this._dragStartPosition = null;
     this._pendingDragPoint = null;
     this._dragOffset = null; // 拖拽偏移量 (Cartesian3)
+    this.selectionListeners = new Set();
+    this.rightClickListeners = new Set();
+  }
+
+  addSelectionListener(callback) {
+    this.selectionListeners.add(callback);
+  }
+
+  removeSelectionListener(callback) {
+    this.selectionListeners.delete(callback);
+  }
+
+  addRightClickListener(callback) {
+    this.rightClickListeners.add(callback);
+  }
+
+  removeRightClickListener(callback) {
+    this.rightClickListeners.delete(callback);
+  }
+
+  _notifySelectionListeners(point) {
+    for (const listener of this.selectionListeners) {
+      try {
+        listener(point);
+      } catch (e) {
+        console.error('Error in selection listener:', e);
+      }
+    }
+  }
+
+  _notifyRightClickListeners(point) {
+    for (const listener of this.rightClickListeners) {
+      try {
+        listener(point);
+      } catch (e) {
+        console.error('Error in right click listener:', e);
+      }
+    }
   }
 
   init(cesium, viewer) {
@@ -25,6 +63,42 @@ class PointsManager {
     this.setupClickHandler();
     this.setupMoveHandler();
     this.setupDragHandler();
+    this.setupRightClickHandler();
+  }
+
+  setupRightClickHandler() {
+    if (this.rightClickHandler) return;
+
+    // Prevent default context menu
+    this.viewer.scene.canvas.addEventListener('contextmenu', (e) => { e.preventDefault(); }, false);
+
+    this.rightClickHandler = new this.cesium.ScreenSpaceEventHandler(this.viewer.scene.canvas);
+    this.rightClickHandler.setInputAction((click) => {
+      let picks = this.viewer.scene.drillPick(click.position) || [];
+      
+      let clickedPoint = null;
+
+      for (const picked of picks) {
+        let entityId = null;
+        if (picked && picked.id && picked.id instanceof this.cesium.Entity) {
+          entityId = picked.id.id;
+        } else if (picked && typeof picked.id === 'string') {
+          entityId = picked.id;
+        }
+
+        if (entityId) {
+          const point = this.points.get(entityId);
+          if (point) {
+            clickedPoint = point;
+            break; // Prioritize top entity
+          }
+        }
+      }
+
+      if (clickedPoint) {
+        this._notifyRightClickListeners(clickedPoint);
+      }
+    }, this.cesium.ScreenSpaceEventType.RIGHT_CLICK);
   }
 
   setupClickHandler() {
@@ -95,6 +169,7 @@ class PointsManager {
     if (point.saveState) point.saveState();
     
     point.trigger('select', point);
+    this._notifySelectionListeners(point);
   }
 
   /**
@@ -604,6 +679,10 @@ class PointsManager {
     if (this.dragHandler) {
       this.dragHandler.destroy();
       this.dragHandler = null;
+    }
+    if (this.rightClickHandler) {
+      this.rightClickHandler.destroy();
+      this.rightClickHandler = null;
     }
     if (this.viewer && this.viewer.scene && this.viewer.scene.canvas) {
       this.viewer.scene.canvas.style.cursor = 'default';
