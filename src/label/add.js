@@ -41,7 +41,7 @@ export function createLabelEntityOptions(Cesium, id, options) {
       horizontalOrigin: Cesium.HorizontalOrigin[options.horizontalOrigin || 'CENTER'],
       verticalOrigin: Cesium.VerticalOrigin[options.verticalOrigin || 'CENTER'],
       heightReference: Cesium.HeightReference[options.heightReference || 'CLAMP_TO_GROUND'],
-      disableDepthTestDistance: options.disableDepthTestDistance,
+      disableDepthTestDistance: options.disableDepthTestDistance === false ? undefined : Number.POSITIVE_INFINITY,
     }
   };
 

@@ -13,11 +13,46 @@ class Debugger {
     this.lang = 'zh'; // Default language
     this._boundOnRightClick = this._onRightClick.bind(this);
     this.titleEl = null;
-    this.highlightEntity = null;
+    this.svgContainer = null;
+    this.connectorPath = null;
+    this.connectorPoint = null;
+    this._removePostRender = null;
   }
 
   init() {
     if (this.container) return;
+
+    // Create SVG Overlay
+    this.svgContainer = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    this.svgContainer.style.cssText = `
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 9998;
+      overflow: visible;
+    `;
+    
+    // Connection Line
+    this.connectorPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    this.connectorPath.setAttribute('fill', 'none');
+    this.connectorPath.setAttribute('stroke', '#38bdf8');
+    this.connectorPath.setAttribute('stroke-width', '1.5');
+    this.connectorPath.setAttribute('stroke-dasharray', '4,4');
+    this.connectorPath.style.filter = 'drop-shadow(0 0 2px rgba(56, 189, 248, 0.5))';
+    this.svgContainer.appendChild(this.connectorPath);
+
+    // Anchor Point
+    this.connectorPoint = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    this.connectorPoint.setAttribute('r', '4');
+    this.connectorPoint.setAttribute('fill', 'rgba(15, 23, 42, 0.85)');
+    this.connectorPoint.setAttribute('stroke', '#38bdf8');
+    this.connectorPoint.setAttribute('stroke-width', '2');
+    this.svgContainer.appendChild(this.connectorPoint);
+
+    document.body.appendChild(this.svgContainer);
 
     // Create container
     this.container = document.createElement('div');
@@ -149,47 +184,87 @@ class Debugger {
   }
 
   _updateHighlight(target) {
-    // Remove existing highlight
-    if (this.highlightEntity) {
-      // Try to find the viewer from the entity or use stored reference
-      // Since we don't store viewer globally, we rely on the target's viewer or the one from previous target
-      if (this.highlightEntity.entityCollection) {
-         this.highlightEntity.entityCollection.remove(this.highlightEntity);
-      }
-      this.highlightEntity = null;
+    // Remove existing listener
+    if (this._removePostRender) {
+      this._removePostRender();
+      this._removePostRender = null;
     }
+
+    // Hide SVG elements initially
+    if (this.connectorPath) this.connectorPath.style.display = 'none';
+    if (this.connectorPoint) this.connectorPoint.style.display = 'none';
 
     if (!target || !target.viewer || !target.cesium) return;
 
+    const scene = target.viewer.scene;
     const Cesium = target.cesium;
-    const viewer = target.viewer;
 
-    // Create a dynamic position callback that follows the target
-    const positionCallback = new Cesium.CallbackProperty(() => {
-        if (!this.currentPoint || !this.currentPoint.position) return undefined;
-        const pos = this.currentPoint.position;
-        return Cesium.Cartesian3.fromDegrees(pos[0], pos[1], pos[2] || 0);
-    }, false);
-
-    // Create a pulsing color callback
-    const colorCallback = new Cesium.CallbackProperty((time) => {
-        const alpha = Math.abs(Math.sin(performance.now() / 500)) * 0.5 + 0.2;
-        return Cesium.Color.YELLOW.withAlpha(alpha);
-    }, false);
-
-    this.highlightEntity = viewer.entities.add({
-        position: positionCallback,
-        point: {
-            pixelSize: 20,
-            color: colorCallback,
-            outlineColor: Cesium.Color.YELLOW,
-            outlineWidth: 2,
-            disableDepthTestDistance: Number.POSITIVE_INFINITY, // Always on top
-            heightReference: target.heightReference === 'clampToGround' 
-                ? Cesium.HeightReference.CLAMP_TO_GROUND 
-                : Cesium.HeightReference.NONE
+    const updateLine = () => {
+        if (!this.container || this.container.style.display === 'none') {
+            if (this.connectorPath) this.connectorPath.style.display = 'none';
+            if (this.connectorPoint) this.connectorPoint.style.display = 'none';
+            return;
         }
-    });
+        
+        // 1. Get Entity Screen Position
+        const pos = target.position; // [lng, lat, alt]
+        let alt = pos[2] || 0;
+
+        // Handle height reference (clampToGround / relativeToGround)
+        if ((target.heightReference === 'clampToGround' || target.heightReference === 'relativeToGround') && scene.globe) {
+            const cartographic = Cesium.Cartographic.fromDegrees(pos[0], pos[1]);
+            const terrainHeight = scene.globe.getHeight(cartographic);
+            if (terrainHeight !== undefined) {
+                if (target.heightReference === 'clampToGround') {
+                    alt = terrainHeight;
+                } else {
+                    alt = terrainHeight + (pos[2] || 0);
+                }
+            }
+        }
+
+        const cartesian = Cesium.Cartesian3.fromDegrees(pos[0], pos[1], alt);
+        
+        let screenPos;
+        if (scene.cartesianToCanvasCoordinates) {
+            screenPos = scene.cartesianToCanvasCoordinates(cartesian);
+        } else if (Cesium.SceneTransforms && Cesium.SceneTransforms.wgs84ToWindowCoordinates) {
+            screenPos = Cesium.SceneTransforms.wgs84ToWindowCoordinates(scene, cartesian);
+        }
+        
+        if (!screenPos) {
+            if (this.connectorPath) this.connectorPath.style.display = 'none';
+            if (this.connectorPoint) this.connectorPoint.style.display = 'none';
+            return;
+        }
+
+        // 2. Get Panel Position (Left Edge Center)
+        const panelRect = this.container.getBoundingClientRect();
+        const panelX = panelRect.left;
+        const panelY = panelRect.top + 45; // Align with title
+        
+        // 3. Draw Curve
+        const p1 = { x: screenPos.x, y: screenPos.y };
+        
+        // Midpoint for S-curve
+        const midX = (p1.x + panelX) / 2;
+        
+        // If panel is to the right (normal case), curve flows nicely.
+        const pathStr = `M ${p1.x} ${p1.y} C ${midX} ${p1.y}, ${midX} ${panelY}, ${panelX} ${panelY}`;
+        
+        if (this.connectorPath) {
+            this.connectorPath.setAttribute('d', pathStr);
+            this.connectorPath.style.display = 'block';
+        }
+
+        if (this.connectorPoint) {
+            this.connectorPoint.setAttribute('cx', p1.x);
+            this.connectorPoint.setAttribute('cy', p1.y);
+            this.connectorPoint.style.display = 'block';
+        }
+    };
+    
+    this._removePostRender = scene.postRender.addEventListener(updateLine);
   }
 
   _onRightClick(point) {

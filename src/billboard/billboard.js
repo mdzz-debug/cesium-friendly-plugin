@@ -23,6 +23,7 @@ export class Billboard {
     this.info = options.info || {};
     this.entity = null;
     this.cesium = options.cesium || null;
+    this.viewer = options.viewer || null;
     this.color = options.color || '#FFFFFF'; // 默认白色，不影响图片颜色
     this.scale = options.scale != null ? options.scale : 1.0;
     this.rotation = options.rotation || 0; // 角度

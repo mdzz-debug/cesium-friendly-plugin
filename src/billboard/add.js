@@ -78,7 +78,8 @@ export function addBillboard(pluginInstance, options = {}) {
   const billboard = new Billboard(id, {
     ...options,
     imageUrl: resolvedImage,
-    cesium: Cesium
+    cesium: Cesium,
+    viewer: viewer
   });
 
   // Create Cesium entity

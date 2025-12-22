@@ -425,7 +425,7 @@ export function renderLabelDebugger(container, labelObj, lang = 'zh') {
       scale: labelObj.scale,
       pixelOffset: labelObj.pixelOffset,
       eyeOffset: labelObj.eyeOffset,
-      disableDepthTestDistance: labelObj.disableDepthTestDistance,
+      disableDepthTestDistance: labelObj.disableDepthTestDistance === Number.POSITIVE_INFINITY,
       heightReference: labelObj.heightReference,
       heightOffset: labelObj.heightOffset,
       minDisplayHeight: labelObj.minDisplayHeight,
@@ -460,6 +460,8 @@ export function renderLabelDebugger(container, labelObj, lang = 'zh') {
      }
      if (labelObj.disableDepthTestDistance === Number.POSITIVE_INFINITY) {
         code += `  disableDepthTestDistance: true,\n`;
+     } else {
+        code += `  disableDepthTestDistance: false,\n`;
      }
      code += `})`; // End add
 
