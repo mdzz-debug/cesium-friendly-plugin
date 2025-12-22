@@ -1,8 +1,10 @@
 
 import pointsManager from '../core/manager.js';
+import flyManager from '../earth/fly.js';
 import { renderPointDebugger } from './point.js';
 import { renderBillboardDebugger } from './billboard.js';
 import { renderLabelDebugger } from './label.js';
+import { renderEarthDebugger } from './earth.js';
 import { t } from './utils.js';
 
 class Debugger {
@@ -194,10 +196,47 @@ class Debugger {
     if (this.connectorPath) this.connectorPath.style.display = 'none';
     if (this.connectorPoint) this.connectorPoint.style.display = 'none';
 
+    // Cleanup earth highlight
+    if (this._earthHighlight) {
+        const scene = this._earthHighlight.scene;
+        if (scene && scene.globe) {
+             scene.globe.enableLighting = this._earthHighlight.originalLighting;
+             scene.globe.atmosphereBrightnessShift = this._earthHighlight.originalAtmosphere;
+        }
+        this._earthHighlight = null;
+    }
+
     if (!target || !target.viewer || !target.cesium) return;
 
     const scene = target.viewer.scene;
     const Cesium = target.cesium;
+
+    // Earth Highlight Logic
+    if (target.type === 'earth') {
+         this._earthHighlight = {
+             scene: scene,
+             originalLighting: scene.globe.enableLighting,
+             originalAtmosphere: scene.globe.atmosphereBrightnessShift
+         };
+         
+         // Highlight effect: Disable lighting (to see map clearly) and boost atmosphere
+         scene.globe.enableLighting = false;
+         scene.globe.atmosphereBrightnessShift = 0.5; // Glow effect
+
+         // Zoom out to see full earth if needed
+         const cameraHeight = scene.camera.positionCartographic.height;
+         if (cameraHeight < 10000000) {
+             const dest = Cesium.Cartesian3.fromDegrees(
+                 target.position.lng,
+                 target.position.lat,
+                 25000000 // High enough to see the globe
+             );
+             scene.camera.flyTo({
+                 destination: dest,
+                 duration: 1.5
+             });
+         }
+    }
 
     const updateLine = () => {
         if (!this.container || this.container.style.display === 'none') {
@@ -208,22 +247,37 @@ class Debugger {
         
         // 1. Get Entity Screen Position
         const pos = target.position; // [lng, lat, alt]
-        let alt = pos[2] || 0;
+        if (!pos) {
+             if (this.connectorPath) this.connectorPath.style.display = 'none';
+             if (this.connectorPoint) this.connectorPoint.style.display = 'none';
+             return;
+        }
+
+        // Validate coordinates
+        let lng = pos.lng || pos[0];
+        let lat = pos.lat || pos[1];
+        let alt = pos.alt || pos[2] || 0;
+
+        if (typeof lng !== 'number' || typeof lat !== 'number') {
+             if (this.connectorPath) this.connectorPath.style.display = 'none';
+             if (this.connectorPoint) this.connectorPoint.style.display = 'none';
+             return;
+        }
 
         // Handle height reference (clampToGround / relativeToGround)
         if ((target.heightReference === 'clampToGround' || target.heightReference === 'relativeToGround') && scene.globe) {
-            const cartographic = Cesium.Cartographic.fromDegrees(pos[0], pos[1]);
+            const cartographic = Cesium.Cartographic.fromDegrees(lng, lat);
             const terrainHeight = scene.globe.getHeight(cartographic);
             if (terrainHeight !== undefined) {
                 if (target.heightReference === 'clampToGround') {
                     alt = terrainHeight;
                 } else {
-                    alt = terrainHeight + (pos[2] || 0);
+                    alt = terrainHeight + alt;
                 }
             }
         }
 
-        const cartesian = Cesium.Cartesian3.fromDegrees(pos[0], pos[1], alt);
+        const cartesian = Cesium.Cartesian3.fromDegrees(lng, lat, alt);
         
         let screenPos;
         if (scene.cartesianToCanvasCoordinates) {
@@ -293,6 +347,8 @@ class Debugger {
       renderBillboardDebugger(this.content, point, this.lang);
     } else if (point.type === 'label') {
       renderLabelDebugger(this.content, point, this.lang);
+    } else if (point.type === 'earth') {
+      renderEarthDebugger(this.content, point, this.lang);
     }
   }
 }

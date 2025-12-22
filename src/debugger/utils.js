@@ -116,7 +116,23 @@ const translations = {
     bgColor: '背景',
     displayHeight: '可见高度',
     min: '最小',
-    max: '最大'
+    max: '最大',
+    earthControl: '地球控制',
+    flyTo: '飞行定位',
+    autoRotate: '地球自转',
+    roaming: '飞行漫游',
+    orbit: '绕点飞行',
+    surfaceTransparency: '地表透明度',
+    speed: '速度',
+    radius: '半径',
+    start: '开始',
+    stop: '停止',
+    currentView: '获取当前视角',
+    heading: '偏航角',
+    pitch: '俯仰角',
+    roll: '翻滚角',
+    functionArea: '功能区',
+    orbitEarth: '围绕地球 (1秒飞行+3圈旋转)'
   },
   en: {
     title: 'Debugger',
@@ -158,7 +174,23 @@ const translations = {
     bgColor: 'Bg',
     displayHeight: 'Visible Ht',
     min: 'Min',
-    max: 'Max'
+    max: 'Max',
+    earthControl: 'Earth Control',
+    flyTo: 'Fly To',
+    autoRotate: 'Auto Rotate',
+    roaming: 'Roaming',
+    orbit: 'Orbit',
+    surfaceTransparency: 'Surface Opacity',
+    speed: 'Speed',
+    radius: 'Radius',
+    start: 'Start',
+    stop: 'Stop',
+    currentView: 'Get Current View',
+    heading: 'Heading',
+    pitch: 'Pitch',
+    roll: 'Roll',
+    functionArea: 'Functions',
+    orbitEarth: 'Orbit Earth (5s Fly + 3 Cycles)'
   }
 };
 

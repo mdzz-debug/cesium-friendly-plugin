@@ -1,5 +1,6 @@
 import pointsManager from './core/manager.js';
 import debuggerManager from './debugger/index.js';
+import flyManager from './earth/fly.js';
 import { addPoint, addMultiple } from './point/add.js';
 import { addBillboard, addMultipleBillboards } from './billboard/add.js';
 import { addLabel, addMultipleLabels } from './label/add.js';
@@ -14,6 +15,7 @@ pluginInstance.init = function(cesium, viewer, options = {}) {
   this._cesium = cesium;
   this._viewer = viewer;
   pointsManager.init(cesium, viewer);
+  flyManager.init(cesium, viewer);
   
   if (options && options.debug) {
     debuggerManager.init();
@@ -42,6 +44,13 @@ pluginInstance.select = (idOrPoint) => {
 };
 pluginInstance.deselect = () => pointsManager.deselect();
 pluginInstance.getSelected = () => pointsManager.getSelectedPoint();
+
+// Earth / Camera Control API
+pluginInstance.flyTo = (position, orientation, duration) => flyManager.flyTo(position, orientation, duration);
+pluginInstance.flyAndOrbit = (position, orientation, duration, cycles) => flyManager.flyAndOrbit(position, orientation, duration, cycles);
+pluginInstance.getCurrentCamera = () => flyManager.getCurrentCamera();
+pluginInstance.setSurfaceOpacity = (opacity) => flyManager.setSurfaceOpacity(opacity);
+pluginInstance.setDepthTest = (enabled) => flyManager.setDepthTest(enabled);
 
 pluginInstance.point = {
   add: (options) => addPoint(pluginInstance, options),

@@ -97,6 +97,26 @@ class PointsManager {
 
       if (clickedPoint) {
         this._notifyRightClickListeners(clickedPoint);
+      } else {
+        // Handle Earth/Globe Click
+        const ray = this.viewer.camera.getPickRay(click.position);
+        const cartesian = this.viewer.scene.globe.pick(ray, this.viewer.scene);
+        
+        if (cartesian) {
+          const cartographic = this.cesium.Cartographic.fromCartesian(cartesian);
+          const earthPoint = {
+            type: 'earth',
+            id: 'earth_debug',
+            position: {
+              lng: this.cesium.Math.toDegrees(cartographic.longitude),
+              lat: this.cesium.Math.toDegrees(cartographic.latitude),
+              alt: cartographic.height
+            },
+            viewer: this.viewer,
+            cesium: this.cesium
+          };
+          this._notifyRightClickListeners(earthPoint);
+        }
       }
     }, this.cesium.ScreenSpaceEventType.RIGHT_CLICK);
   }
