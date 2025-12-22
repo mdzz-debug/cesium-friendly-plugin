@@ -345,6 +345,32 @@ export function renderLabelDebugger(container, labelObj, lang = 'zh') {
   eyeOffsetRow.appendChild(eyeOffsetContainer);
   container.appendChild(eyeOffsetRow);
 
+  // Disable Depth Test Distance
+  const depthTestRow = createControlRow(t('depthTest', lang) || 'Depth Test', LABEL_WIDTH);
+  const depthTestContainer = document.createElement('div');
+  depthTestContainer.style.display = 'flex';
+  depthTestContainer.style.gap = '8px';
+  depthTestContainer.style.alignItems = 'center';
+
+  const depthTestCheck = document.createElement('input');
+  depthTestCheck.type = 'checkbox';
+  depthTestCheck.checked = labelObj.disableDepthTestDistance === Number.POSITIVE_INFINITY;
+  depthTestCheck.style.cursor = 'pointer';
+
+  const depthTestLabel = document.createElement('span');
+  depthTestLabel.textContent = t('alwaysOnTop', lang) || 'Always On Top';
+  depthTestLabel.style.fontSize = '12px';
+  depthTestLabel.style.color = '#ccc';
+
+  depthTestCheck.addEventListener('change', (e) => {
+    labelObj.setDisableDepthTestDistance(e.target.checked);
+  });
+
+  depthTestContainer.appendChild(depthTestCheck);
+  depthTestContainer.appendChild(depthTestLabel);
+  depthTestRow.appendChild(depthTestContainer);
+  container.appendChild(depthTestRow);
+
   // Display Height Range
   const displayHeightRow = createControlRow(t('displayHeight', lang));
   displayHeightRow.style.display = 'block';
@@ -399,6 +425,7 @@ export function renderLabelDebugger(container, labelObj, lang = 'zh') {
       scale: labelObj.scale,
       pixelOffset: labelObj.pixelOffset,
       eyeOffset: labelObj.eyeOffset,
+      disableDepthTestDistance: labelObj.disableDepthTestDistance,
       heightReference: labelObj.heightReference,
       heightOffset: labelObj.heightOffset,
       minDisplayHeight: labelObj.minDisplayHeight,
@@ -430,6 +457,9 @@ export function renderLabelDebugger(container, labelObj, lang = 'zh') {
      code += `  pixelOffset: [${labelObj.pixelOffset.join(', ')}],\n`;
      if (labelObj.eyeOffset && (labelObj.eyeOffset[0] !== 0 || labelObj.eyeOffset[1] !== 0 || labelObj.eyeOffset[2] !== 0)) {
         code += `  eyeOffset: [${labelObj.eyeOffset.join(', ')}],\n`;
+     }
+     if (labelObj.disableDepthTestDistance === Number.POSITIVE_INFINITY) {
+        code += `  disableDepthTestDistance: true,\n`;
      }
      code += `})`; // End add
 

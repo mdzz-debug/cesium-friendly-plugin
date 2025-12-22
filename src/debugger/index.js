@@ -13,6 +13,7 @@ class Debugger {
     this.lang = 'zh'; // Default language
     this._boundOnRightClick = this._onRightClick.bind(this);
     this.titleEl = null;
+    this.highlightEntity = null;
   }
 
   init() {
@@ -120,6 +121,7 @@ class Debugger {
     closeBtn.onclick = () => {
       this.container.style.display = 'none';
       this.currentPoint = null;
+      this._updateHighlight(null);
     };
     header.appendChild(closeBtn);
 
@@ -143,11 +145,57 @@ class Debugger {
     if (this.container) {
       this.container.style.display = 'none';
     }
+    this._updateHighlight(null);
+  }
+
+  _updateHighlight(target) {
+    // Remove existing highlight
+    if (this.highlightEntity) {
+      // Try to find the viewer from the entity or use stored reference
+      // Since we don't store viewer globally, we rely on the target's viewer or the one from previous target
+      if (this.highlightEntity.entityCollection) {
+         this.highlightEntity.entityCollection.remove(this.highlightEntity);
+      }
+      this.highlightEntity = null;
+    }
+
+    if (!target || !target.viewer || !target.cesium) return;
+
+    const Cesium = target.cesium;
+    const viewer = target.viewer;
+
+    // Create a dynamic position callback that follows the target
+    const positionCallback = new Cesium.CallbackProperty(() => {
+        if (!this.currentPoint || !this.currentPoint.position) return undefined;
+        const pos = this.currentPoint.position;
+        return Cesium.Cartesian3.fromDegrees(pos[0], pos[1], pos[2] || 0);
+    }, false);
+
+    // Create a pulsing color callback
+    const colorCallback = new Cesium.CallbackProperty((time) => {
+        const alpha = Math.abs(Math.sin(performance.now() / 500)) * 0.5 + 0.2;
+        return Cesium.Color.YELLOW.withAlpha(alpha);
+    }, false);
+
+    this.highlightEntity = viewer.entities.add({
+        position: positionCallback,
+        point: {
+            pixelSize: 20,
+            color: colorCallback,
+            outlineColor: Cesium.Color.YELLOW,
+            outlineWidth: 2,
+            disableDepthTestDistance: Number.POSITIVE_INFINITY, // Always on top
+            heightReference: target.heightReference === 'clampToGround' 
+                ? Cesium.HeightReference.CLAMP_TO_GROUND 
+                : Cesium.HeightReference.NONE
+        }
+    });
   }
 
   _onRightClick(point) {
     if (!this.enabled) return;
     this.currentPoint = point;
+    this._updateHighlight(point);
     this.render();
     this.container.style.display = 'block';
   }

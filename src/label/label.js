@@ -26,7 +26,7 @@ export class Label {
     this.scaleByDistance = options.scaleByDistance || null;
     this.translucencyByDistance = options.translucencyByDistance || null;
     this.pixelOffsetScaleByDistance = options.pixelOffsetScaleByDistance || null;
-    this.disableDepthTestDistance = options.disableDepthTestDistance || undefined;
+    this.disableDepthTestDistance = options.disableDepthTestDistance === false ? undefined : Number.POSITIVE_INFINITY;
     
     this.cesium = options.cesium || null;
     this.viewer = options.viewer || null;
@@ -177,6 +177,9 @@ export class Label {
       
       if (this.entity.label) {
         this.entity.label.heightReference = hr;
+        if (this.disableDepthTestDistance !== undefined) {
+             this.entity.label.disableDepthTestDistance = this.disableDepthTestDistance;
+        }
       }
       
       this.entity.position = this.cesium.Cartesian3.fromDegrees(
@@ -201,6 +204,14 @@ export class Label {
     this.eyeOffset = [x, y, z];
     if (this.entity && this.entity.label) {
         this.entity.label.eyeOffset = new this.cesium.Cartesian3(x, y, z);
+    }
+    return this;
+  }
+
+  setDisableDepthTestDistance(disable) {
+    this.disableDepthTestDistance = disable === false ? undefined : Number.POSITIVE_INFINITY;
+    if (this.entity && this.entity.label) {
+        this.entity.label.disableDepthTestDistance = this.disableDepthTestDistance;
     }
     return this;
   }
