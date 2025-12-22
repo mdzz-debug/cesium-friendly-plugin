@@ -41,7 +41,8 @@ cf.label.add({
 | `heightOffset` | Number | 否 | `0` | 相对地面的高度偏移量 |
 | `minDisplayHeight` | Number | 否 | `0` | 最小显示高度（相机高度小于此值不显示） |
 | `maxDisplayHeight` | Number | 否 | `Infinity` | 最大显示高度（相机高度大于此值不显示） |
-| `group` | String | 否 | - | 分组名称 |
+| `pixelOffsetScaleByDistance` | Object | 否 | - | 随距离缩放像素偏移 |
+| `disableDepthTestDistance` | Boolean/Number | 否 | `true` | 是否禁用深度检测 (true 为始终置顶) |
 
 ### 批量创建 `cf.label.addMultiple(list, shared)`
 

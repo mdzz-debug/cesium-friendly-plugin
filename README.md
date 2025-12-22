@@ -1,11 +1,11 @@
 # Cesium Friendly Plugin
 
-![Version](https://img.shields.io/badge/version-1.0.1-blue.svg)
+![Version](https://img.shields.io/badge/version-1.0.2-blue.svg)
 <!-- [![GitHub](https://img.shields.io/badge/GitHub-Repo-black?logo=github)](https://github.com/mdzz-debug/cesium-friendly-plugin) -->
 
 Cesium 开发伴侣，提供一套友好的链式调用 API，简化 Cesium 原生繁琐的实体管理、事件绑定和交互逻辑。
 
-> **版本 v1.0.1 更新**: 全面增强 **广告牌 (Billboard)** 功能，支持拖拽、旋转、缩放及事件系统；**点位 (Point)** 新增拖拽支持；优化选中/取消选中状态管理。
+> **版本 v1.0.2 更新**: 新增 **文字 (Label)** 系统及配套调试面板；增强 **调试器 (Debugger)** 体验，新增 SVG 引导连接线；修复贴地模式下的显示问题。
 
 ## 特性
 
@@ -28,6 +28,7 @@ Cesium 开发伴侣，提供一套友好的链式调用 API，简化 Cesium 原�
 | 命名空间 | 方法示例 | 说明 |
 | :--- | :--- | :--- |
 | **`cf.billboard`** | `add`, `get`, `remove` | 仅操作**广告牌** |
+| **`cf.label`** | `add`, `get`, `remove` | 仅操作**文字** |
 | **`cf.point`** | `add`, `get`, `remove` | 仅操作**点位** |
 
 **示例**：
@@ -103,10 +104,26 @@ cf.point.add([116.40, 39.91])
   });
 ```
 
+### 4. 添加文字 (Label)
+
+```javascript
+cf.label.add({
+  position: [116.405, 39.905],
+  text: 'Cesium Friendly',
+  fontSize: 24,
+  color: '#FFFFFF',
+  backgroundColor: 'rgba(0,0,0,0.5)'
+}).setHeight(200) // 设置高度
+  .setDisableDepthTestDistance(true) // 开启置顶（不被遮挡）
+  .on('click', (l) => {
+    console.log('点击了文字:', l.text);
+  });
+```
+
 ## 功能模块文档
 
 - [🖼️ 广告牌 (Billboard) API 文档](./src/billboard/README.md)
-  - 图片展示、缩放旋转、拖拽交互、状态管理。
+- [📝 文字 (Label) API 文档](./src/label/README.md)
 - [📍 点位 (Point) API 文档](./src/point/README.md)
   - 基础点位、样式设置、有效期（TTL）、批量管理。
 
