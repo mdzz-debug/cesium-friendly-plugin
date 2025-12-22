@@ -2,6 +2,7 @@ import pointsManager from './core/manager.js';
 import debuggerManager from './debugger/index.js';
 import { addPoint, addMultiple } from './point/add.js';
 import { addBillboard, addMultipleBillboards } from './billboard/add.js';
+import { addLabel, addMultipleLabels } from './label/add.js';
 
 const pluginInstance = {
   version: '1.0.0',
@@ -62,6 +63,17 @@ pluginInstance.billboard = {
   removeAll: () => pointsManager.removeAllPoints('billboard'),
   updatePosition: (id, position) => pointsManager.updatePointPosition(id, position, 'billboard'),
   removeGroup: (groupName) => pointsManager.removeGroup(groupName, 'billboard')
+};
+
+pluginInstance.label = {
+  add: (options) => addLabel(pluginInstance, options),
+  addMultiple: (list, shared) => addMultipleLabels(pluginInstance, list, shared),
+  get: (id) => pointsManager.getByType(id, 'label'),
+  getAll: () => pointsManager.getAllByType('label'),
+  remove: (idOrPoint) => pointsManager.removePoint(idOrPoint, 'label'),
+  removeAll: () => pointsManager.removeAllPoints('label'),
+  updatePosition: (id, position) => pointsManager.updatePointPosition(id, position, 'label'),
+  removeGroup: (groupName) => pointsManager.removeGroup(groupName, 'label')
 };
 
 // Export for ES6 modules

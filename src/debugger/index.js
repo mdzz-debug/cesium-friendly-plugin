@@ -2,6 +2,7 @@
 import pointsManager from '../core/manager.js';
 import { renderPointDebugger } from './point.js';
 import { renderBillboardDebugger } from './billboard.js';
+import { renderLabelDebugger } from './label.js';
 import { t } from './utils.js';
 
 class Debugger {
@@ -167,6 +168,8 @@ class Debugger {
       renderPointDebugger(this.content, point, this.lang);
     } else if (point.type === 'billboard') {
       renderBillboardDebugger(this.content, point, this.lang);
+    } else if (point.type === 'label') {
+      renderLabelDebugger(this.content, point, this.lang);
     }
   }
 }

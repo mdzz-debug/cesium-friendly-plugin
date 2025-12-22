@@ -68,7 +68,8 @@ export function addPoint(pluginInstance, options = {}) {
   // Create point instance
   const point = new Point(id, {
     ...options,
-    cesium: Cesium // Pass Cesium object for color operations
+    cesium: Cesium, // Pass Cesium object for color operations
+    viewer: viewer  // Pass viewer for label operations
   });
   if (point.imageUrl !== null && point.imageUrl !== undefined) {
     point.imageUrl = resolveImageInput(point.imageUrl);

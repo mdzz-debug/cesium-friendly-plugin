@@ -1,4 +1,4 @@
-export function createControlRow(label) {
+export function createControlRow(label, width) {
   const row = document.createElement('div');
   row.style.marginBottom = '16px';
   row.style.display = 'flex';
@@ -10,6 +10,12 @@ export function createControlRow(label) {
   labelEl.style.fontSize = '13px';
   labelEl.style.color = '#ccc';
   labelEl.style.fontWeight = '500';
+  
+  if (width) {
+    labelEl.style.width = width;
+    labelEl.style.flexShrink = '0';
+  }
+
   row.appendChild(labelEl);
   
   return row;
@@ -97,36 +103,58 @@ const translations = {
     size: '大小',
     ms: '毫秒',
     px: '像素',
-    deg: '度'
+    deg: '度',
+    label: '标签',
+    showLabel: '显示',
+    labelText: '内容',
+    bold: '加粗',
+    labelHeight: '海拔偏移',
+    pixelOffset: '像素偏移',
+    eyeOffset: '视点偏移',
+    bgColor: '背景',
+    displayHeight: '可见高度',
+    min: '最小',
+    max: '最大'
   },
   en: {
-    title: 'Entity Debugger',
+    title: 'Debugger',
     group: 'Group',
     defaultGroup: 'Default',
     location: 'Location',
     color: 'Color',
-    pixelSize: 'Pixel Size',
+    pixelSize: 'Size (px)',
     opacity: 'Opacity',
     outline: 'Outline',
-    flash: 'Flash',
-    flashDuration: 'Duration(ms)',
+    flash: 'Flash (ms)',
+    flashDuration: 'Period (ms)',
     copyConfig: 'Copy Config',
     copyChain: 'Copy Chain',
     copied: 'Copied!',
     rotation: 'Rotation',
     scale: 'Scale',
-    height: 'Height',
+    height: 'Height Control',
     clamp: 'Clamp',
     offset: 'Offset',
-    tintColor: 'Tint Color',
+    tintColor: 'Tint',
     image: 'Image',
-    lng: 'Lng',
+    lng: 'Lon',
     lat: 'Lat',
     alt: 'Alt',
     size: 'Size',
     ms: 'ms',
     px: 'px',
-    deg: 'deg'
+    deg: 'deg',
+    label: 'Label',
+    showLabel: 'Show',
+    labelText: 'Text',
+    bold: 'Bold',
+    labelHeight: 'Alt Offset',
+    pixelOffset: 'Px Offset',
+    eyeOffset: 'Eye Offset',
+    bgColor: 'Bg',
+    displayHeight: 'Visible Ht',
+    min: 'Min',
+    max: 'Max'
   }
 };
 

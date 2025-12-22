@@ -1,4 +1,6 @@
 import pointsManager from '../core/manager.js';
+import { Label } from '../label/label.js';
+import { createLabelEntityOptions } from '../label/add.js';
 
 export class Point {
   constructor(id, options = {}) {
@@ -10,6 +12,7 @@ export class Point {
     this.info = options.info || {};
     this.entity = null;
     this.cesium = options.cesium || null;
+    this.viewer = options.viewer || null;
     this.color = options.color || '#FF0000';
     this.pixelSize = options.pixelSize || 10;
     this.imageUrl = options.imageUrl || null;
@@ -23,6 +26,8 @@ export class Point {
     this._flashing = false;
     this._hidden = false;
     this._savedState = null;
+    
+    this.labelObj = null; // Label instance
   }
   setEntity(entity) {
     this.entity = entity;
@@ -31,6 +36,121 @@ export class Point {
   getEntity() {
     return this.entity;
   }
+  
+  // --- Label Integration ---
+  
+  /**
+   * Show label for this point
+   * @param {Object} options Label options (text, color, fontSize, etc.)
+   */
+  showLabel(options = {}) {
+    if (!this.viewer || !this.cesium) {
+      console.warn('Point: Cannot show label, viewer or cesium not available.');
+      return this;
+    }
+
+    const labelText = options.text || options.name || this.name || '';
+    
+    // If label already exists, we might want to update it or recreate it
+    // For simplicity, let's recreate it to ensure all options apply, 
+    // unless we want to optimize.
+    if (this.labelObj) {
+        this.hideLabel();
+    }
+    
+    const labelId = this.id + '-label';
+    const labelOptions = {
+        ...options,
+        id: labelId,
+        text: labelText,
+        position: this.position, // Use point's position
+        viewer: this.viewer,
+        cesium: this.cesium,
+        // Inherit height reference from point if not specified
+        heightReference: options.heightReference || this.heightReference,
+        heightOffset: options.heightOffset !== undefined ? options.heightOffset : this.heightOffset,
+        // Default eyeOffset to prevent occlusion by the point itself
+        // Moves the label 5 meters closer to the camera
+        eyeOffset: options.eyeOffset || [0, 0, -5]
+    };
+
+    // Create Label Instance
+    this.labelObj = new Label(labelId, labelOptions);
+    
+    // Create Entity using shared logic
+    // Note: createLabelEntityOptions expects options.position to be array [lng, lat, height]
+    // this.position is [lng, lat, height]
+    const entityOptions = createLabelEntityOptions(this.cesium, labelId, labelOptions);
+    
+    // Add to viewer
+    const entity = this.viewer.entities.add(entityOptions);
+    this.labelObj.setEntity(entity);
+    
+    // Note: We do NOT register this label with pointsManager to avoid double management 
+    // or cluttering the global list if it's considered "part of" the point.
+    // However, this means `cf.label.getAll()` won't return it. 
+    // This is consistent with "point internally calls label".
+
+    return this;
+  }
+
+  hideLabel() {
+    if (this.labelObj) {
+        try {
+            if (this.labelObj.getEntity()) {
+                this.viewer.entities.remove(this.labelObj.getEntity());
+            }
+        } catch (e) {
+            console.warn('Failed to remove label entity:', e);
+        }
+        
+        try {
+            this.labelObj.destroy();
+        } catch (e) {
+            console.warn('Failed to destroy label object:', e);
+        }
+        
+        this.labelObj = null;
+    }
+    return this;
+  }
+
+  updateLabel(options) {
+      if (this.labelObj) {
+          // Partial update if supported, else recreate
+          // Label class supports some updates
+          if (options.text !== undefined) this.labelObj.setText(options.text);
+          if (options.color !== undefined) this.labelObj.setColor(options.color);
+          if (options.backgroundColor !== undefined) this.labelObj.setBackgroundColor(options.backgroundColor);
+          if (options.fontSize !== undefined) this.labelObj.setFontSize(options.fontSize);
+          if (options.bold !== undefined) this.labelObj.setBold(options.bold);
+          if (options.heightOffset !== undefined) this.labelObj.setHeight(options.heightOffset);
+          if (options.pixelOffset !== undefined) this.labelObj.setPixelOffset(options.pixelOffset[0], options.pixelOffset[1]);
+          if (options.minDisplayHeight !== undefined || options.maxDisplayHeight !== undefined) {
+             const min = options.minDisplayHeight !== undefined ? options.minDisplayHeight : this.labelObj.minDisplayHeight;
+             const max = options.maxDisplayHeight !== undefined ? options.maxDisplayHeight : this.labelObj.maxDisplayHeight;
+             this.labelObj.setDisplayHeightRange(min, max);
+          }
+          // For other complex property changes, might be easier to recreate
+      } else {
+          this.showLabel(options);
+      }
+      return this;
+  }
+  
+  // --- End Label Integration ---
+
+  // Clean up
+  destroy() {
+    this.hideLabel();
+    if (this._flashTimer) {
+      clearInterval(this._flashTimer);
+      this._flashTimer = null;
+    }
+    this.entity = null;
+    this._eventHandlers.clear();
+  }
+
   on(type, handler) {
     if (!this._eventHandlers.has(type)) this._eventHandlers.set(type, new Set());
     this._eventHandlers.get(type).add(handler);
@@ -58,6 +178,9 @@ export class Point {
   }
   updatePosition(position) {
     this.position = position;
+    if (this.labelObj) {
+      this.labelObj.updatePosition(position);
+    }
     return this;
   }
   setDraggable(enable) {
@@ -272,7 +395,17 @@ export class Point {
     this._savedState = {
       color: this.color,
       pixelSize: this.pixelSize,
-      opacity: this.opacity
+      opacity: this.opacity,
+      label: this.labelObj ? {
+          text: this.labelObj.text,
+          fontSize: this.labelObj.fontSize,
+          bold: this.labelObj.bold,
+          backgroundColor: this.labelObj.backgroundColor,
+          heightOffset: this.labelObj.heightOffset,
+          pixelOffset: this.labelObj.pixelOffset,
+          minDisplayHeight: this.labelObj.minDisplayHeight,
+          maxDisplayHeight: this.labelObj.maxDisplayHeight
+      } : null
     };
     return this;
   }
@@ -282,17 +415,26 @@ export class Point {
       this.setColor(this._savedState.color);
       this.setPixelSize(this._savedState.pixelSize);
       this.setOpacity(this._savedState.opacity);
+
+      // Restore label state
+      if (this._savedState.label) {
+          const opts = this._savedState.label;
+          this.showLabel({
+              text: opts.text,
+              fontSize: opts.fontSize,
+              bold: opts.bold,
+              backgroundColor: opts.backgroundColor,
+              heightOffset: opts.heightOffset,
+              pixelOffset: opts.pixelOffset,
+              minDisplayHeight: opts.minDisplayHeight,
+              maxDisplayHeight: opts.maxDisplayHeight
+          });
+      } else {
+          this.hideLabel();
+      }
+
       this._savedState = null;
     }
     return this;
-  }
-
-  destroy() {
-    if (this._flashTimer) {
-      clearInterval(this._flashTimer);
-      this._flashTimer = null;
-    }
-    this.entity = null;
-    this._eventHandlers.clear();
   }
 }

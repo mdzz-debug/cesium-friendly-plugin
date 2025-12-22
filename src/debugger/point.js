@@ -300,6 +300,274 @@ export function renderPointDebugger(container, point, lang = 'zh') {
   flashRow.appendChild(flashContainer);
   container.appendChild(flashRow);
 
+  // --- Label Controls ---
+  const labelRow = createControlRow(t('label', lang));
+  labelRow.style.display = 'block';
+  labelRow.firstChild.style.width = '100%';
+  labelRow.firstChild.style.marginBottom = '8px';
+  
+  const labelContainer = document.createElement('div');
+  labelContainer.style.display = 'flex';
+  labelContainer.style.flexDirection = 'column';
+  labelContainer.style.gap = '8px';
+  labelContainer.style.width = '100%';
+
+  // 1. Show Label Toggle + Height Offset
+  const row1 = document.createElement('div');
+  row1.style.display = 'flex';
+  row1.style.alignItems = 'center';
+  row1.style.justifyContent = 'space-between';
+
+  // Show Label
+  const showLabelContainer = document.createElement('div');
+  showLabelContainer.style.display = 'flex';
+  showLabelContainer.style.alignItems = 'center';
+  showLabelContainer.style.gap = '8px';
+
+  const showLabelCheck = document.createElement('input');
+  showLabelCheck.type = 'checkbox';
+  showLabelCheck.checked = !!point.labelObj;
+  showLabelCheck.style.cursor = 'pointer';
+
+  const showLabelText = document.createElement('span');
+  showLabelText.textContent = t('showLabel', lang);
+  showLabelText.style.fontSize = '11px';
+  showLabelText.style.color = '#ccc';
+
+  showLabelContainer.appendChild(showLabelCheck);
+  showLabelContainer.appendChild(showLabelText);
+  row1.appendChild(showLabelContainer);
+
+  // Label Height Offset
+  const labelHeightContainer = document.createElement('div');
+  labelHeightContainer.style.display = 'flex';
+  labelHeightContainer.style.alignItems = 'center';
+  labelHeightContainer.style.gap = '4px';
+
+  const labelHeightLabel = document.createElement('span');
+  labelHeightLabel.textContent = t('labelHeight', lang);
+  labelHeightLabel.style.fontSize = '11px';
+  labelHeightLabel.style.color = '#ccc';
+
+  const labelHeightInput = document.createElement('input');
+  labelHeightInput.type = 'number';
+  labelHeightInput.value = point.labelObj ? point.labelObj.heightOffset : (point.heightOffset || 0);
+  styleInput(labelHeightInput);
+  labelHeightInput.style.width = '70px';
+
+  labelHeightContainer.appendChild(labelHeightLabel);
+  labelHeightContainer.appendChild(labelHeightInput);
+  row1.appendChild(labelHeightContainer);
+
+  labelContainer.appendChild(row1);
+
+  // Pixel Offset Control
+  const pixelOffsetRow = document.createElement('div');
+  pixelOffsetRow.style.display = 'flex';
+  pixelOffsetRow.style.alignItems = 'center';
+  pixelOffsetRow.style.justifyContent = 'space-between';
+  pixelOffsetRow.style.marginBottom = '4px';
+
+  const pixelOffsetLabel = document.createElement('span');
+  pixelOffsetLabel.textContent = t('pixelOffset', lang);
+  pixelOffsetLabel.style.fontSize = '11px';
+  pixelOffsetLabel.style.color = '#ccc';
+
+  const pixelOffsetInputs = document.createElement('div');
+  pixelOffsetInputs.style.display = 'flex';
+  pixelOffsetInputs.style.gap = '4px';
+
+  const pixelOffsetXInput = document.createElement('input');
+  pixelOffsetXInput.type = 'number';
+  pixelOffsetXInput.placeholder = 'X';
+  pixelOffsetXInput.value = point.labelObj ? (point.labelObj.pixelOffset[0] || 0) : 0;
+  styleInput(pixelOffsetXInput);
+  pixelOffsetXInput.style.width = '60px';
+
+  const pixelOffsetYInput = document.createElement('input');
+  pixelOffsetYInput.type = 'number';
+  pixelOffsetYInput.placeholder = 'Y';
+  pixelOffsetYInput.value = point.labelObj ? (point.labelObj.pixelOffset[1] || 0) : 0;
+  styleInput(pixelOffsetYInput);
+  pixelOffsetYInput.style.width = '60px';
+
+  pixelOffsetInputs.appendChild(pixelOffsetXInput);
+  pixelOffsetInputs.appendChild(pixelOffsetYInput);
+  pixelOffsetRow.appendChild(pixelOffsetLabel);
+  pixelOffsetRow.appendChild(pixelOffsetInputs);
+  
+  labelContainer.appendChild(pixelOffsetRow);
+
+  // 2. Text Input
+  const labelTextInput = document.createElement('input');
+  labelTextInput.type = 'text';
+  labelTextInput.placeholder = t('labelText', lang);
+  labelTextInput.value = point.labelObj ? point.labelObj.text : (point.name || '');
+  styleInput(labelTextInput);
+  labelTextInput.style.width = '240px';
+  labelTextInput.style.boxSizing = 'border-box';
+  labelContainer.appendChild(labelTextInput);
+
+  // 3. Font Size, Bold, Background Color
+  const row3 = document.createElement('div');
+  row3.style.display = 'flex';
+  row3.style.alignItems = 'center';
+  row3.style.gap = '10px';
+  row3.style.flexWrap = 'wrap';
+
+  // Font Size
+  const fontSizeContainer = document.createElement('div');
+  fontSizeContainer.style.display = 'flex';
+  fontSizeContainer.style.alignItems = 'center';
+  fontSizeContainer.style.gap = '4px';
+
+  const fontSizeInput = document.createElement('input');
+  fontSizeInput.type = 'number';
+  fontSizeInput.min = '8';
+  fontSizeInput.max = '72';
+  fontSizeInput.value = point.labelObj ? point.labelObj.fontSize : 14;
+  styleInput(fontSizeInput);
+  fontSizeInput.style.width = '60px';
+  
+  const pxLabel = document.createElement('span');
+  pxLabel.textContent = 'px';
+  pxLabel.style.fontSize = '11px';
+  pxLabel.style.color = '#ccc';
+
+  fontSizeContainer.appendChild(fontSizeInput);
+  fontSizeContainer.appendChild(pxLabel);
+  row3.appendChild(fontSizeContainer);
+
+  // Bold
+  const boldContainer = document.createElement('label');
+  boldContainer.style.display = 'flex';
+  boldContainer.style.alignItems = 'center';
+  boldContainer.style.gap = '4px';
+  boldContainer.style.cursor = 'pointer';
+  
+  const boldCheck = document.createElement('input');
+  boldCheck.type = 'checkbox';
+  boldCheck.checked = point.labelObj ? point.labelObj.bold : false;
+  
+  const boldText = document.createElement('span');
+  boldText.textContent = 'B';
+  boldText.style.fontWeight = 'bold';
+  boldText.style.fontSize = '11px';
+  boldText.style.color = '#ccc';
+
+  boldContainer.appendChild(boldCheck);
+  boldContainer.appendChild(boldText);
+  row3.appendChild(boldContainer);
+
+  // Background Color
+  const bgContainer = document.createElement('div');
+  bgContainer.style.display = 'flex';
+  bgContainer.style.alignItems = 'center';
+  bgContainer.style.gap = '4px';
+
+  const bgCheck = document.createElement('input');
+  bgCheck.type = 'checkbox';
+  bgCheck.checked = point.labelObj ? point.labelObj.showBackground : false;
+  
+  const bgColorInput = document.createElement('input');
+  bgColorInput.type = 'color';
+  bgColorInput.value = (point.labelObj && point.labelObj.backgroundColor) ? colorToHex(point.labelObj.backgroundColor) : '#000000';
+  bgColorInput.style.border = 'none';
+  bgColorInput.style.width = '20px';
+  bgColorInput.style.height = '20px';
+  bgColorInput.style.padding = '0';
+  bgColorInput.style.background = 'none';
+  bgColorInput.style.cursor = 'pointer';
+
+  const bgLabel = document.createElement('span');
+  bgLabel.textContent = t('bgColor', lang);
+  bgLabel.style.fontSize = '11px';
+  bgLabel.style.color = '#ccc';
+
+  bgContainer.appendChild(bgCheck);
+  bgContainer.appendChild(bgColorInput);
+  bgContainer.appendChild(bgLabel);
+  row3.appendChild(bgContainer);
+  
+  labelContainer.appendChild(row3);
+
+  // 4. Display Height Range (Min/Max)
+  const rangeRow = document.createElement('div');
+  rangeRow.style.display = 'flex';
+  rangeRow.style.alignItems = 'center';
+  rangeRow.style.justifyContent = 'space-between';
+  rangeRow.style.marginTop = '4px';
+  rangeRow.style.width = '100%';
+  
+  const rangeLabel = document.createElement('span');
+  rangeLabel.textContent = t('displayHeight', lang);
+  rangeLabel.style.fontSize = '11px';
+  rangeLabel.style.color = '#ccc';
+  rangeRow.appendChild(rangeLabel);
+
+  const rangeInputs = document.createElement('div');
+  rangeInputs.style.display = 'flex';
+  rangeInputs.style.alignItems = 'center';
+  rangeInputs.style.gap = '4px';
+
+  // Min
+  const minInput = document.createElement('input');
+  minInput.type = 'number';
+  minInput.placeholder = t('min', lang);
+  minInput.value = point.labelObj ? point.labelObj.minDisplayHeight : 0;
+  styleInput(minInput);
+  minInput.style.width = '80px';
+  
+  // Max
+  const maxInput = document.createElement('input');
+  maxInput.type = 'number';
+  maxInput.placeholder = t('max', lang);
+  // Handle Infinity for max display height
+  const maxH = point.labelObj ? point.labelObj.maxDisplayHeight : Infinity;
+  maxInput.value = maxH === Infinity ? '' : maxH;
+  styleInput(maxInput);
+  maxInput.style.width = '80px';
+
+  rangeInputs.appendChild(minInput);
+  rangeInputs.appendChild(document.createTextNode('-'));
+  rangeInputs.appendChild(maxInput);
+  rangeRow.appendChild(rangeInputs);
+  
+  labelContainer.appendChild(rangeRow);
+
+  // Update Logic
+  const updateLabel = () => {
+    if (showLabelCheck.checked) {
+      const options = {
+        text: labelTextInput.value || point.name || 'Label',
+        fontSize: parseInt(fontSizeInput.value) || 14,
+        bold: boldCheck.checked,
+        heightOffset: parseFloat(labelHeightInput.value) || 0,
+        pixelOffset: [parseFloat(pixelOffsetXInput.value) || 0, parseFloat(pixelOffsetYInput.value) || 0],
+        backgroundColor: bgCheck.checked ? bgColorInput.value : null,
+        minDisplayHeight: parseFloat(minInput.value) || 0,
+        maxDisplayHeight: maxInput.value === '' ? Infinity : parseFloat(maxInput.value)
+      };
+      
+      if (point.labelObj) {
+        point.updateLabel(options);
+      } else {
+        point.showLabel(options);
+      }
+    } else {
+      point.hideLabel();
+    }
+  };
+
+  [showLabelCheck, fontSizeInput, boldCheck, labelHeightInput, pixelOffsetXInput, pixelOffsetYInput, bgCheck, bgColorInput, minInput, maxInput].forEach(el => {
+      el.addEventListener('change', updateLabel);
+  });
+  // Real-time update for text
+  labelTextInput.addEventListener('input', updateLabel);
+
+  labelRow.appendChild(labelContainer);
+  container.appendChild(labelRow);
+
   // Copy Config Buttons
   const btnRow = document.createElement('div');
   btnRow.style.display = 'flex';
@@ -326,6 +594,20 @@ export function renderPointDebugger(container, point, lang = 'zh') {
         duration: parseInt(flashDurationInput.value)
       }
     };
+
+    if (showLabelCheck.checked) {
+      config.label = {
+        text: labelTextInput.value || point.name || 'Label',
+        fontSize: parseInt(fontSizeInput.value) || 14,
+        bold: boldCheck.checked,
+        heightOffset: parseFloat(labelHeightInput.value) || 0,
+        pixelOffset: [parseFloat(pixelOffsetXInput.value) || 0, parseFloat(pixelOffsetYInput.value) || 0],
+        backgroundColor: bgCheck.checked ? bgColorInput.value : undefined,
+        minDisplayHeight: parseFloat(minInput.value) || 0,
+        maxDisplayHeight: maxInput.value === '' ? undefined : parseFloat(maxInput.value)
+      };
+    }
+
     navigator.clipboard.writeText(JSON.stringify(config, null, 2))
       .then(() => {
         const originalText = copyConfigBtn.textContent;
@@ -359,6 +641,23 @@ export function renderPointDebugger(container, point, lang = 'zh') {
     if (flashCheck.checked) {
       chain += `.setFlash(true, ${flashDurationInput.value})`;
     }
+
+    if (showLabelCheck.checked) {
+        const labelOpts = {
+            text: labelTextInput.value,
+            fontSize: parseInt(fontSizeInput.value),
+            bold: boldCheck.checked,
+            heightOffset: parseFloat(labelHeightInput.value),
+            pixelOffset: [parseFloat(pixelOffsetXInput.value) || 0, parseFloat(pixelOffsetYInput.value) || 0],
+            backgroundColor: bgCheck.checked ? bgColorInput.value : undefined,
+            minDisplayHeight: parseFloat(minInput.value) || undefined,
+            maxDisplayHeight: maxInput.value === '' ? undefined : parseFloat(maxInput.value)
+        };
+        // Remove undefined keys
+        Object.keys(labelOpts).forEach(key => labelOpts[key] === undefined && delete labelOpts[key]);
+        chain += `.showLabel(${JSON.stringify(labelOpts)})`;
+    }
+
     chain += ';';
     navigator.clipboard.writeText(chain)
       .then(() => {
