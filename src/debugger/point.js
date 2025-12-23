@@ -136,7 +136,8 @@ export function renderPointDebugger(container, point, lang = 'zh') {
   heightInput.step = '1';
   heightInput.value = point.heightOffset || 0;
   heightInput.placeholder = t('offset', lang);
-  heightInput.style.width = '60px';
+  heightInput.style.flex = '1';
+  heightInput.style.minWidth = '0';
   styleInput(heightInput);
 
   // Events
@@ -179,7 +180,8 @@ export function renderPointDebugger(container, point, lang = 'zh') {
   sizeInput.min = '1';
   sizeInput.max = '100';
   sizeInput.value = point.pixelSize;
-  sizeInput.style.width = '80px';
+  sizeInput.style.flex = '1';
+  sizeInput.style.minWidth = '0';
   styleInput(sizeInput);
   sizeInput.addEventListener('input', (e) => {
     const val = parseInt(e.target.value);
@@ -198,7 +200,8 @@ export function renderPointDebugger(container, point, lang = 'zh') {
   opacityInput.max = '1';
   opacityInput.step = '0.1';
   opacityInput.value = point.opacity;
-  opacityInput.style.width = '120px';
+  opacityInput.style.flex = '1';
+  opacityInput.style.minWidth = '0';
   opacityInput.style.cursor = 'pointer';
   opacityInput.addEventListener('input', (e) => {
     const val = parseFloat(e.target.value);
@@ -216,22 +219,12 @@ export function renderPointDebugger(container, point, lang = 'zh') {
 
   const outlineCheck = document.createElement('input');
   outlineCheck.type = 'checkbox';
-  outlineCheck.checked = point.entity && point.entity.point && point.entity.point.outlineWidth > 0;
+  outlineCheck.checked = point.outline;
   outlineCheck.style.cursor = 'pointer';
 
   const outlineColorInput = document.createElement('input');
   outlineColorInput.type = 'color';
-  
-  // Safe color access
-  let defaultOutline = '#000000';
-  if (point.entity && point.entity.point && point.entity.point.outlineColor) {
-      const col = point.entity.point.outlineColor.getValue ? point.entity.point.outlineColor.getValue(new Date()) : point.entity.point.outlineColor;
-      if (col && col.toCssColorString) {
-          defaultOutline = col.toCssColorString();
-      }
-  }
-  outlineColorInput.value = colorToHex(defaultOutline);
-  
+  outlineColorInput.value = colorToHex(point.outlineColor || '#FFFFFF');
   outlineColorInput.style.width = '30px';
   outlineColorInput.style.height = '20px';
   outlineColorInput.style.border = 'none';
@@ -243,11 +236,10 @@ export function renderPointDebugger(container, point, lang = 'zh') {
   outlineWidthInput.type = 'number';
   outlineWidthInput.min = '1';
   outlineWidthInput.max = '10';
-  outlineWidthInput.value = (point.entity && point.entity.point && point.entity.point.outlineWidth) || 2;
+  outlineWidthInput.value = point.outlineWidth || 2;
   outlineWidthInput.style.width = '50px';
   styleInput(outlineWidthInput);
 
-  // Events
   const updateOutline = () => {
     point.setOutline(
       outlineCheck.checked,
@@ -266,307 +258,187 @@ export function renderPointDebugger(container, point, lang = 'zh') {
   outlineRow.appendChild(outlineContainer);
   container.appendChild(outlineRow);
 
-  // Flash Control
-  const flashRow = createControlRow(t('flash', lang));
-  const flashContainer = document.createElement('div');
-  flashContainer.style.display = 'flex';
-  flashContainer.style.gap = '8px';
-  flashContainer.style.alignItems = 'center';
+  // Distance Display
+  const distanceRow = createControlRow(t('distanceDisplay', lang));
+  const distanceContainer = document.createElement('div');
+  distanceContainer.style.display = 'flex';
+  distanceContainer.style.gap = '4px';
 
-  const flashCheck = document.createElement('input');
-  flashCheck.type = 'checkbox';
-  flashCheck.checked = point._flashing;
-  flashCheck.style.cursor = 'pointer';
+  const nearInput = document.createElement('input');
+  nearInput.type = 'number';
+  nearInput.placeholder = t('near', lang);
+  nearInput.value = point.distanceDisplayCondition ? point.distanceDisplayCondition.near : 0;
+  nearInput.style.flex = '1';
+  nearInput.style.minWidth = '0';
+  styleInput(nearInput);
 
-  // Flash Duration Input
-  const flashDurationInput = document.createElement('input');
-  flashDurationInput.type = 'number';
-  flashDurationInput.min = '100';
-  flashDurationInput.step = '100';
-  flashDurationInput.placeholder = t('ms', lang);
-  flashDurationInput.value = 1000;
-  flashDurationInput.style.width = '70px';
-  styleInput(flashDurationInput);
+  const farInput = document.createElement('input');
+  farInput.type = 'number';
+  farInput.placeholder = t('far', lang);
+  farInput.value = point.distanceDisplayCondition ? point.distanceDisplayCondition.far : '';
+  farInput.style.flex = '1';
+  farInput.style.minWidth = '0';
+  styleInput(farInput);
 
-  const updateFlash = () => {
-    point.setFlash(flashCheck.checked, parseInt(flashDurationInput.value));
+  const updateDistance = () => {
+    const n = parseFloat(nearInput.value) || 0;
+    const f = parseFloat(farInput.value);
+    point.setDistanceDisplayCondition(n, isNaN(f) ? undefined : f);
   };
+  nearInput.addEventListener('input', updateDistance);
+  farInput.addEventListener('input', updateDistance);
 
-  flashCheck.addEventListener('change', updateFlash);
-  flashDurationInput.addEventListener('change', updateFlash); // update on blur/enter
+  distanceContainer.appendChild(nearInput);
+  distanceContainer.appendChild(farInput);
+  distanceRow.appendChild(distanceContainer);
+  container.appendChild(distanceRow);
 
-  flashContainer.appendChild(flashCheck);
-  flashContainer.appendChild(flashDurationInput);
-  flashRow.appendChild(flashContainer);
-  container.appendChild(flashRow);
+  // Scale By Distance
+  const scaleDistRow = createControlRow(t('scaleByDistance', lang));
+  const scaleDistContainer = document.createElement('div');
+  scaleDistContainer.style.display = 'grid';
+  scaleDistContainer.style.gridTemplateColumns = '1fr 1fr';
+  scaleDistContainer.style.gap = '4px';
 
-  // --- Label Controls ---
-  const labelRow = createControlRow(t('label', lang));
-  labelRow.style.display = 'block';
-  labelRow.firstChild.style.width = '100%';
-  labelRow.firstChild.style.marginBottom = '8px';
-  
-  const labelContainer = document.createElement('div');
-  labelContainer.style.display = 'flex';
-  labelContainer.style.flexDirection = 'column';
-  labelContainer.style.gap = '8px';
-  labelContainer.style.width = '100%';
+  const snInput = document.createElement('input');
+  snInput.type = 'number';
+  snInput.placeholder = t('near', lang);
+  snInput.value = point.scaleByDistance ? point.scaleByDistance.near : '';
+  snInput.style.flex = '1';
+  snInput.style.minWidth = '0';
+  styleInput(snInput);
 
-  // 1. Show Label Toggle + Height Offset
-  const row1 = document.createElement('div');
-  row1.style.display = 'flex';
-  row1.style.alignItems = 'center';
-  row1.style.justifyContent = 'space-between';
+  const snvInput = document.createElement('input');
+  snvInput.type = 'number';
+  snvInput.placeholder = t('nearValue', lang);
+  snvInput.value = point.scaleByDistance ? point.scaleByDistance.nearValue : '';
+  snvInput.style.flex = '1';
+  snvInput.style.minWidth = '0';
+  styleInput(snvInput);
 
-  // Show Label
-  const showLabelContainer = document.createElement('div');
-  showLabelContainer.style.display = 'flex';
-  showLabelContainer.style.alignItems = 'center';
-  showLabelContainer.style.gap = '8px';
+  const sfInput = document.createElement('input');
+  sfInput.type = 'number';
+  sfInput.placeholder = t('far', lang);
+  sfInput.value = point.scaleByDistance ? point.scaleByDistance.far : '';
+  sfInput.style.flex = '1';
+  sfInput.style.minWidth = '0';
+  styleInput(sfInput);
 
-  const showLabelCheck = document.createElement('input');
-  showLabelCheck.type = 'checkbox';
-  showLabelCheck.checked = !!point.labelObj;
-  showLabelCheck.style.cursor = 'pointer';
+  const sfvInput = document.createElement('input');
+  sfvInput.type = 'number';
+  sfvInput.placeholder = t('farValue', lang);
+  sfvInput.value = point.scaleByDistance ? point.scaleByDistance.farValue : '';
+  sfvInput.style.flex = '1';
+  sfvInput.style.minWidth = '0';
+  styleInput(sfvInput);
 
-  const showLabelText = document.createElement('span');
-  showLabelText.textContent = t('showLabel', lang);
-  showLabelText.style.fontSize = '11px';
-  showLabelText.style.color = '#ccc';
-
-  showLabelContainer.appendChild(showLabelCheck);
-  showLabelContainer.appendChild(showLabelText);
-  row1.appendChild(showLabelContainer);
-
-  // Label Height Offset
-  const labelHeightContainer = document.createElement('div');
-  labelHeightContainer.style.display = 'flex';
-  labelHeightContainer.style.alignItems = 'center';
-  labelHeightContainer.style.gap = '4px';
-
-  const labelHeightLabel = document.createElement('span');
-  labelHeightLabel.textContent = t('labelHeight', lang);
-  labelHeightLabel.style.fontSize = '11px';
-  labelHeightLabel.style.color = '#ccc';
-
-  const labelHeightInput = document.createElement('input');
-  labelHeightInput.type = 'number';
-  labelHeightInput.value = point.labelObj ? point.labelObj.heightOffset : (point.heightOffset || 0);
-  styleInput(labelHeightInput);
-  labelHeightInput.style.width = '70px';
-
-  labelHeightContainer.appendChild(labelHeightLabel);
-  labelHeightContainer.appendChild(labelHeightInput);
-  row1.appendChild(labelHeightContainer);
-
-  labelContainer.appendChild(row1);
-
-  // Pixel Offset Control
-  const pixelOffsetRow = document.createElement('div');
-  pixelOffsetRow.style.display = 'flex';
-  pixelOffsetRow.style.alignItems = 'center';
-  pixelOffsetRow.style.justifyContent = 'space-between';
-  pixelOffsetRow.style.marginBottom = '4px';
-
-  const pixelOffsetLabel = document.createElement('span');
-  pixelOffsetLabel.textContent = t('pixelOffset', lang);
-  pixelOffsetLabel.style.fontSize = '11px';
-  pixelOffsetLabel.style.color = '#ccc';
-
-  const pixelOffsetInputs = document.createElement('div');
-  pixelOffsetInputs.style.display = 'flex';
-  pixelOffsetInputs.style.gap = '4px';
-
-  const pixelOffsetXInput = document.createElement('input');
-  pixelOffsetXInput.type = 'number';
-  pixelOffsetXInput.placeholder = 'X';
-  pixelOffsetXInput.value = point.labelObj ? (point.labelObj.pixelOffset[0] || 0) : 0;
-  styleInput(pixelOffsetXInput);
-  pixelOffsetXInput.style.width = '60px';
-
-  const pixelOffsetYInput = document.createElement('input');
-  pixelOffsetYInput.type = 'number';
-  pixelOffsetYInput.placeholder = 'Y';
-  pixelOffsetYInput.value = point.labelObj ? (point.labelObj.pixelOffset[1] || 0) : 0;
-  styleInput(pixelOffsetYInput);
-  pixelOffsetYInput.style.width = '60px';
-
-  pixelOffsetInputs.appendChild(pixelOffsetXInput);
-  pixelOffsetInputs.appendChild(pixelOffsetYInput);
-  pixelOffsetRow.appendChild(pixelOffsetLabel);
-  pixelOffsetRow.appendChild(pixelOffsetInputs);
-  
-  labelContainer.appendChild(pixelOffsetRow);
-
-  // 2. Text Input
-  const labelTextInput = document.createElement('input');
-  labelTextInput.type = 'text';
-  labelTextInput.placeholder = t('labelText', lang);
-  labelTextInput.value = point.labelObj ? point.labelObj.text : (point.name || '');
-  styleInput(labelTextInput);
-  labelTextInput.style.width = '240px';
-  labelTextInput.style.boxSizing = 'border-box';
-  labelContainer.appendChild(labelTextInput);
-
-  // 3. Font Size, Bold, Background Color
-  const row3 = document.createElement('div');
-  row3.style.display = 'flex';
-  row3.style.alignItems = 'center';
-  row3.style.gap = '10px';
-  row3.style.flexWrap = 'wrap';
-
-  // Font Size
-  const fontSizeContainer = document.createElement('div');
-  fontSizeContainer.style.display = 'flex';
-  fontSizeContainer.style.alignItems = 'center';
-  fontSizeContainer.style.gap = '4px';
-
-  const fontSizeInput = document.createElement('input');
-  fontSizeInput.type = 'number';
-  fontSizeInput.min = '8';
-  fontSizeInput.max = '72';
-  fontSizeInput.value = point.labelObj ? point.labelObj.fontSize : 14;
-  styleInput(fontSizeInput);
-  fontSizeInput.style.width = '60px';
-  
-  const pxLabel = document.createElement('span');
-  pxLabel.textContent = 'px';
-  pxLabel.style.fontSize = '11px';
-  pxLabel.style.color = '#ccc';
-
-  fontSizeContainer.appendChild(fontSizeInput);
-  fontSizeContainer.appendChild(pxLabel);
-  row3.appendChild(fontSizeContainer);
-
-  // Bold
-  const boldContainer = document.createElement('label');
-  boldContainer.style.display = 'flex';
-  boldContainer.style.alignItems = 'center';
-  boldContainer.style.gap = '4px';
-  boldContainer.style.cursor = 'pointer';
-  
-  const boldCheck = document.createElement('input');
-  boldCheck.type = 'checkbox';
-  boldCheck.checked = point.labelObj ? point.labelObj.bold : false;
-  
-  const boldText = document.createElement('span');
-  boldText.textContent = 'B';
-  boldText.style.fontWeight = 'bold';
-  boldText.style.fontSize = '11px';
-  boldText.style.color = '#ccc';
-
-  boldContainer.appendChild(boldCheck);
-  boldContainer.appendChild(boldText);
-  row3.appendChild(boldContainer);
-
-  // Background Color
-  const bgContainer = document.createElement('div');
-  bgContainer.style.display = 'flex';
-  bgContainer.style.alignItems = 'center';
-  bgContainer.style.gap = '4px';
-
-  const bgCheck = document.createElement('input');
-  bgCheck.type = 'checkbox';
-  bgCheck.checked = point.labelObj ? point.labelObj.showBackground : false;
-  
-  const bgColorInput = document.createElement('input');
-  bgColorInput.type = 'color';
-  bgColorInput.value = (point.labelObj && point.labelObj.backgroundColor) ? colorToHex(point.labelObj.backgroundColor) : '#000000';
-  bgColorInput.style.border = 'none';
-  bgColorInput.style.width = '20px';
-  bgColorInput.style.height = '20px';
-  bgColorInput.style.padding = '0';
-  bgColorInput.style.background = 'none';
-  bgColorInput.style.cursor = 'pointer';
-
-  const bgLabel = document.createElement('span');
-  bgLabel.textContent = t('bgColor', lang);
-  bgLabel.style.fontSize = '11px';
-  bgLabel.style.color = '#ccc';
-
-  bgContainer.appendChild(bgCheck);
-  bgContainer.appendChild(bgColorInput);
-  bgContainer.appendChild(bgLabel);
-  row3.appendChild(bgContainer);
-  
-  labelContainer.appendChild(row3);
-
-  // 4. Display Height Range (Min/Max)
-  const rangeRow = document.createElement('div');
-  rangeRow.style.display = 'flex';
-  rangeRow.style.alignItems = 'center';
-  rangeRow.style.justifyContent = 'space-between';
-  rangeRow.style.marginTop = '4px';
-  rangeRow.style.width = '100%';
-  
-  const rangeLabel = document.createElement('span');
-  rangeLabel.textContent = t('displayHeight', lang);
-  rangeLabel.style.fontSize = '11px';
-  rangeLabel.style.color = '#ccc';
-  rangeRow.appendChild(rangeLabel);
-
-  const rangeInputs = document.createElement('div');
-  rangeInputs.style.display = 'flex';
-  rangeInputs.style.alignItems = 'center';
-  rangeInputs.style.gap = '4px';
-
-  // Min
-  const minInput = document.createElement('input');
-  minInput.type = 'number';
-  minInput.placeholder = t('min', lang);
-  minInput.value = point.labelObj ? point.labelObj.minDisplayHeight : 0;
-  styleInput(minInput);
-  minInput.style.width = '80px';
-  
-  // Max
-  const maxInput = document.createElement('input');
-  maxInput.type = 'number';
-  maxInput.placeholder = t('max', lang);
-  // Handle Infinity for max display height
-  const maxH = point.labelObj ? point.labelObj.maxDisplayHeight : Infinity;
-  maxInput.value = maxH === Infinity ? '' : maxH;
-  styleInput(maxInput);
-  maxInput.style.width = '80px';
-
-  rangeInputs.appendChild(minInput);
-  rangeInputs.appendChild(document.createTextNode('-'));
-  rangeInputs.appendChild(maxInput);
-  rangeRow.appendChild(rangeInputs);
-  
-  labelContainer.appendChild(rangeRow);
-
-  // Update Logic
-  const updateLabel = () => {
-    if (showLabelCheck.checked) {
-      const options = {
-        text: labelTextInput.value || point.name || 'Label',
-        fontSize: parseInt(fontSizeInput.value) || 14,
-        bold: boldCheck.checked,
-        heightOffset: parseFloat(labelHeightInput.value) || 0,
-        pixelOffset: [parseFloat(pixelOffsetXInput.value) || 0, parseFloat(pixelOffsetYInput.value) || 0],
-        backgroundColor: bgCheck.checked ? bgColorInput.value : null,
-        minDisplayHeight: parseFloat(minInput.value) || 0,
-        maxDisplayHeight: maxInput.value === '' ? Infinity : parseFloat(maxInput.value)
-      };
-      
-      if (point.labelObj) {
-        point.updateLabel(options);
-      } else {
-        point.showLabel(options);
-      }
-    } else {
-      point.hideLabel();
+  const updateScaleByDist = () => {
+    const n = parseFloat(snInput.value);
+    const nv = parseFloat(snvInput.value);
+    const f = parseFloat(sfInput.value);
+    const fv = parseFloat(sfvInput.value);
+    if (!isNaN(n) && !isNaN(nv) && !isNaN(f) && !isNaN(fv)) {
+        point.setScaleByDistance(n, nv, f, fv);
     }
   };
+  snInput.addEventListener('input', updateScaleByDist);
+  snvInput.addEventListener('input', updateScaleByDist);
+  sfInput.addEventListener('input', updateScaleByDist);
+  sfvInput.addEventListener('input', updateScaleByDist);
 
-  [showLabelCheck, fontSizeInput, boldCheck, labelHeightInput, pixelOffsetXInput, pixelOffsetYInput, bgCheck, bgColorInput, minInput, maxInput].forEach(el => {
-      el.addEventListener('change', updateLabel);
+  scaleDistContainer.appendChild(snInput);
+  scaleDistContainer.appendChild(snvInput);
+  scaleDistContainer.appendChild(sfInput);
+  scaleDistContainer.appendChild(sfvInput);
+  scaleDistRow.appendChild(scaleDistContainer);
+  container.appendChild(scaleDistRow);
+
+  // Translucency By Distance
+  const transDistRow = createControlRow(t('translucencyByDistance', lang));
+  const transDistContainer = document.createElement('div');
+  transDistContainer.style.display = 'grid';
+  transDistContainer.style.gridTemplateColumns = '1fr 1fr';
+  transDistContainer.style.gap = '4px';
+
+  const tnInput = document.createElement('input');
+  tnInput.type = 'number';
+  tnInput.placeholder = t('near', lang);
+  tnInput.value = point.translucencyByDistance ? point.translucencyByDistance.near : '';
+  tnInput.style.flex = '1';
+  tnInput.style.minWidth = '0';
+  styleInput(tnInput);
+
+  const tnvInput = document.createElement('input');
+  tnvInput.type = 'number';
+  tnvInput.placeholder = t('nearValue', lang);
+  tnvInput.value = point.translucencyByDistance ? point.translucencyByDistance.nearValue : '';
+  tnvInput.style.flex = '1';
+  tnvInput.style.minWidth = '0';
+  styleInput(tnvInput);
+
+  const tfInput = document.createElement('input');
+  tfInput.type = 'number';
+  tfInput.placeholder = t('far', lang);
+  tfInput.value = point.translucencyByDistance ? point.translucencyByDistance.far : '';
+  tfInput.style.flex = '1';
+  tfInput.style.minWidth = '0';
+  styleInput(tfInput);
+
+  const tfvInput = document.createElement('input');
+  tfvInput.type = 'number';
+  tfvInput.placeholder = t('farValue', lang);
+  tfvInput.value = point.translucencyByDistance ? point.translucencyByDistance.farValue : '';
+  tfvInput.style.flex = '1';
+  tfvInput.style.minWidth = '0';
+  styleInput(tfvInput);
+
+  const updateTransByDist = () => {
+    const n = parseFloat(tnInput.value);
+    const nv = parseFloat(tnvInput.value);
+    const f = parseFloat(tfInput.value);
+    const fv = parseFloat(tfvInput.value);
+    if (!isNaN(n) && !isNaN(nv) && !isNaN(f) && !isNaN(fv)) {
+        point.setTranslucencyByDistance(n, nv, f, fv);
+    }
+  };
+  tnInput.addEventListener('input', updateTransByDist);
+  tnvInput.addEventListener('input', updateTransByDist);
+  tfInput.addEventListener('input', updateTransByDist);
+  tfvInput.addEventListener('input', updateTransByDist);
+
+  transDistContainer.appendChild(tnInput);
+  transDistContainer.appendChild(tnvInput);
+  transDistContainer.appendChild(tfInput);
+  transDistContainer.appendChild(tfvInput);
+  transDistRow.appendChild(transDistContainer);
+  container.appendChild(transDistRow);
+
+  // Disable Depth Test Distance
+  const depthTestRow = createControlRow(t('depthTest', lang));
+  const depthTestContainer = document.createElement('div');
+  depthTestContainer.style.display = 'flex';
+  depthTestContainer.style.gap = '8px';
+  depthTestContainer.style.alignItems = 'center';
+
+  const depthTestCheck = document.createElement('input');
+  depthTestCheck.type = 'checkbox';
+  depthTestCheck.checked = point.disableDepthTestDistance === Number.POSITIVE_INFINITY;
+  depthTestCheck.style.cursor = 'pointer';
+
+  const depthTestLabel = document.createElement('span');
+  depthTestLabel.textContent = t('alwaysOnTop', lang);
+  depthTestLabel.style.fontSize = '12px';
+  depthTestLabel.style.color = '#ccc';
+
+  depthTestCheck.addEventListener('change', (e) => {
+    // If checked (Always On Top), we set to Infinity. Otherwise undefined (default depth test)
+    point.setDisableDepthTestDistance(e.target.checked ? Number.POSITIVE_INFINITY : undefined);
   });
-  // Real-time update for text
-  labelTextInput.addEventListener('input', updateLabel);
 
-  labelRow.appendChild(labelContainer);
-  container.appendChild(labelRow);
+  depthTestContainer.appendChild(depthTestCheck);
+  depthTestContainer.appendChild(depthTestLabel);
+  depthTestRow.appendChild(depthTestContainer);
+  container.appendChild(depthTestRow);
 
   // Copy Config Buttons
   const btnRow = document.createElement('div');
@@ -574,91 +446,88 @@ export function renderPointDebugger(container, point, lang = 'zh') {
   btnRow.style.gap = '10px';
   btnRow.style.marginTop = '20px';
 
-  const copyConfigBtn = createButton(t('copyConfig', lang), () => {
-    const config = {
-      type: 'point',
-      group: point.group,
-      position: point.position,
-      heightReference: point.heightReference,
-      heightOffset: point.heightOffset,
-      color: point.color,
-      pixelSize: point.pixelSize,
-      opacity: point.opacity,
-      outline: {
-        show: outlineCheck.checked,
-        color: outlineColorInput.value,
-        width: parseInt(outlineWidthInput.value)
-      },
-      flash: {
-        enabled: flashCheck.checked,
-        duration: parseInt(flashDurationInput.value)
-      }
-    };
+  const copyNativeBtn = createButton(t('copyNative', lang), () => {
+    const isRelative = point.heightReference === 'relativeToGround';
+    const h = isRelative ? (point.heightOffset || 0) : (point.position[2] || 0) + (point.heightOffset || 0);
+    
+    let nativeCode = `viewer.entities.add({\n` +
+      `  position: Cesium.Cartesian3.fromDegrees(${point.position[0]}, ${point.position[1]}, ${h}),\n` +
+      `  point: {\n` +
+      `    pixelSize: ${point.pixelSize},\n` +
+      `    color: Cesium.Color.fromCssColorString('${point.color}').withAlpha(${point.opacity}),\n` +
+      `    outlineWidth: ${point.outline ? point.outlineWidth : 0},\n` +
+      `    outlineColor: ${point.outline ? `Cesium.Color.fromCssColorString('${point.outlineColor}').withAlpha(${point.opacity})` : 'Cesium.Color.TRANSPARENT'},\n`;
 
-    if (showLabelCheck.checked) {
-      config.label = {
-        text: labelTextInput.value || point.name || 'Label',
-        fontSize: parseInt(fontSizeInput.value) || 14,
-        bold: boldCheck.checked,
-        heightOffset: parseFloat(labelHeightInput.value) || 0,
-        pixelOffset: [parseFloat(pixelOffsetXInput.value) || 0, parseFloat(pixelOffsetYInput.value) || 0],
-        backgroundColor: bgCheck.checked ? bgColorInput.value : undefined,
-        minDisplayHeight: parseFloat(minInput.value) || 0,
-        maxDisplayHeight: maxInput.value === '' ? undefined : parseFloat(maxInput.value)
-      };
+    if (point.heightReference === 'clampToGround') {
+        nativeCode += `    heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,\n`;
+    } else if (point.heightReference === 'relativeToGround') {
+        nativeCode += `    heightReference: Cesium.HeightReference.RELATIVE_TO_GROUND,\n`;
     }
 
-    navigator.clipboard.writeText(JSON.stringify(config, null, 2))
+    if (point.disableDepthTestDistance === Number.POSITIVE_INFINITY) {
+        nativeCode += `    disableDepthTestDistance: Number.POSITIVE_INFINITY,\n`;
+    }
+
+    if (point.distanceDisplayCondition) {
+        nativeCode += `    distanceDisplayCondition: new Cesium.DistanceDisplayCondition(${point.distanceDisplayCondition.near}, ${point.distanceDisplayCondition.far}),\n`;
+    }
+
+    if (point.scaleByDistance) {
+        nativeCode += `    scaleByDistance: new Cesium.NearFarScalar(${point.scaleByDistance.near}, ${point.scaleByDistance.nearValue}, ${point.scaleByDistance.far}, ${point.scaleByDistance.farValue}),\n`;
+    }
+    
+    if (point.translucencyByDistance) {
+        nativeCode += `    translucencyByDistance: new Cesium.NearFarScalar(${point.translucencyByDistance.near}, ${point.translucencyByDistance.nearValue}, ${point.translucencyByDistance.far}, ${point.translucencyByDistance.farValue}),\n`;
+    }
+
+    nativeCode += `  }\n});`;
+
+    navigator.clipboard.writeText(nativeCode)
       .then(() => {
-        const originalText = copyConfigBtn.textContent;
-        copyConfigBtn.textContent = t('copied', lang);
-        copyConfigBtn.style.background = '#10b981';
+        const originalText = copyNativeBtn.textContent;
+        copyNativeBtn.textContent = t('copied', lang);
+        copyNativeBtn.style.background = '#10b981';
         setTimeout(() => {
-          copyConfigBtn.textContent = originalText;
-          copyConfigBtn.style.background = '#3b82f6';
+          copyNativeBtn.textContent = originalText;
+          copyNativeBtn.style.background = '#3b82f6';
         }, 2000);
       });
   });
 
   const copyChainBtn = createButton(t('copyChain', lang), () => {
-    let chain = `pointsManager.add({\n` +
-      `  position: [${point.position.join(', ')}],\n` +
+    let chain = `entity.point({\n` +
       `  color: '${point.color}',\n` +
       `  pixelSize: ${point.pixelSize},\n` +
-      `  opacity: ${point.opacity}\n` +
-      `})`;
-    
+      `  opacity: ${point.opacity},\n` +
+      `  outline: ${point.outline},\n` +
+      `  outlineColor: '${point.outlineColor}',\n` +
+      `  outlineWidth: ${point.outlineWidth}`;
+
     if (point.heightReference === 'clampToGround') {
-      chain += `.setClampToGround(true)`;
+      chain += `,\n  heightReference: 'clampToGround'`;
+    } else if (point.heightReference === 'relativeToGround') {
+      chain += `,\n  heightReference: 'relativeToGround'`;
     }
+
     if (point.heightOffset !== 0) {
-      chain += `.setHeight(${point.heightOffset})`;
+      chain += `,\n  heightOffset: ${point.heightOffset}`;
+    }
+    
+    if (point.distanceDisplayCondition) {
+        chain += `,\n  distanceDisplayCondition: { near: ${point.distanceDisplayCondition.near}, far: ${point.distanceDisplayCondition.far} }`;
+    }
+    if (point.scaleByDistance) {
+        chain += `,\n  scaleByDistance: { near: ${point.scaleByDistance.near}, nearValue: ${point.scaleByDistance.nearValue}, far: ${point.scaleByDistance.far}, farValue: ${point.scaleByDistance.farValue} }`;
+    }
+    if (point.translucencyByDistance) {
+        chain += `,\n  translucencyByDistance: { near: ${point.translucencyByDistance.near}, nearValue: ${point.translucencyByDistance.nearValue}, far: ${point.translucencyByDistance.far}, farValue: ${point.translucencyByDistance.farValue} }`;
+    }
+    if (point.disableDepthTestDistance === Number.POSITIVE_INFINITY) {
+        chain += `,\n  disableDepthTestDistance: true`;
     }
 
-    if (outlineCheck.checked) {
-      chain += `.setOutline(true, '${outlineColorInput.value}', ${outlineWidthInput.value})`;
-    }
-    if (flashCheck.checked) {
-      chain += `.setFlash(true, ${flashDurationInput.value})`;
-    }
+    chain += `\n})`;
 
-    if (showLabelCheck.checked) {
-        const labelOpts = {
-            text: labelTextInput.value,
-            fontSize: parseInt(fontSizeInput.value),
-            bold: boldCheck.checked,
-            heightOffset: parseFloat(labelHeightInput.value),
-            pixelOffset: [parseFloat(pixelOffsetXInput.value) || 0, parseFloat(pixelOffsetYInput.value) || 0],
-            backgroundColor: bgCheck.checked ? bgColorInput.value : undefined,
-            minDisplayHeight: parseFloat(minInput.value) || undefined,
-            maxDisplayHeight: maxInput.value === '' ? undefined : parseFloat(maxInput.value)
-        };
-        // Remove undefined keys
-        Object.keys(labelOpts).forEach(key => labelOpts[key] === undefined && delete labelOpts[key]);
-        chain += `.showLabel(${JSON.stringify(labelOpts)})`;
-    }
-
-    chain += ';';
     navigator.clipboard.writeText(chain)
       .then(() => {
         const originalText = copyChainBtn.textContent;
@@ -671,7 +540,7 @@ export function renderPointDebugger(container, point, lang = 'zh') {
       });
   }, 'secondary');
 
-  btnRow.appendChild(copyConfigBtn);
+  btnRow.appendChild(copyNativeBtn);
   btnRow.appendChild(copyChainBtn);
   container.appendChild(btnRow);
 }

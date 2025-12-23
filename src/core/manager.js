@@ -605,26 +605,54 @@ class PointsManager {
     }
   }
 
-  findPointsAtPosition(position, epsilon = 1e-8) {
+  findPointsAtPosition(position, epsilon = 1e-5) {
     if (!position || position.length < 2) return [];
     const [lng, lat] = position;
+    const height = position[2] || 0;
     const res = [];
     for (const point of this.points.values()) {
       const pos = point.position || [];
       if (pos.length < 2) continue;
-      if (Math.abs(pos[0] - lng) <= epsilon && Math.abs(pos[1] - lat) <= epsilon) {
+      
+      const pLng = pos[0];
+      const pLat = pos[1];
+      const pHeight = pos[2] || 0;
+
+      // Relaxed check: match lat/lng, and match height only if both are non-zero
+      // If one of them is 0 (likely clampToGround or 2D), we treat it as a match on 2D plane
+      // This helps with clampToGround duplicate detection
+      const latLngMatch = Math.abs(pLng - lng) <= epsilon && Math.abs(pLat - lat) <= epsilon;
+      
+      let heightMatch = true;
+      if (height !== 0 && pHeight !== 0) {
+          heightMatch = Math.abs(pHeight - height) <= epsilon;
+      }
+      
+      if (latLngMatch && heightMatch) {
         res.push(point);
       }
     }
     return res;
   }
 
-  removeDuplicatesAtPosition(position, groupName, excludeId) {
+  removeDuplicatesAtPosition(position, groupName, excludeIdOrIds) {
     const found = this.findPointsAtPosition(position);
     let count = 0;
     const newGroup = groupName || null;
+    
+    // Normalize exclude IDs to a Set for fast lookup
+    const excludeSet = new Set();
+    if (excludeIdOrIds) {
+        if (Array.isArray(excludeIdOrIds)) {
+            excludeIdOrIds.forEach(id => excludeSet.add(id));
+        } else {
+            excludeSet.add(excludeIdOrIds);
+        }
+    }
+
     for (const p of found) {
-      if (excludeId && p.id === excludeId) continue;
+      if (excludeSet.has(p.id)) continue;
+      
       const sameGroup = (p.group || null) === newGroup;
       if (sameGroup) {
         if (this.removePoint(p)) count++;
@@ -682,6 +710,24 @@ class PointsManager {
       this.groups.delete(groupName);
     }
     return count;
+  }
+
+  showGroup(groupName) {
+    const ids = this.groups.get(groupName);
+    if (!ids) return;
+    for (const id of ids) {
+      const point = this.points.get(id);
+      if (point) point.show();
+    }
+  }
+
+  hideGroup(groupName) {
+    const ids = this.groups.get(groupName);
+    if (!ids) return;
+    for (const id of ids) {
+      const point = this.points.get(id);
+      if (point) point.hide();
+    }
   }
 
   /**

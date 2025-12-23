@@ -64,6 +64,7 @@ class Debugger {
       top: 20px;
       right: 20px;
       width: 420px;
+      height: 90vh;
       background: rgba(15, 23, 42, 0.85);
       color: #e2e8f0;
       padding: 24px;
@@ -76,6 +77,7 @@ class Debugger {
       -webkit-backdrop-filter: blur(16px);
       border: 1px solid rgba(56, 189, 248, 0.2);
       transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      overflow-y: auto;
     `;
 
     // Title & Close Button Container

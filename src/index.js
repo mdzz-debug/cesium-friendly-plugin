@@ -1,9 +1,7 @@
 import pointsManager from './core/manager.js';
 import debuggerManager from './debugger/index.js';
 import flyManager from './earth/fly.js';
-import { addPoint, addMultiple } from './point/add.js';
-import { addBillboard, addMultipleBillboards } from './billboard/add.js';
-import { addLabel, addMultipleLabels } from './label/add.js';
+import { createEntityApi } from './entity/index.js';
 
 const pluginInstance = {
   version: '1.0.0',
@@ -31,12 +29,17 @@ pluginInstance.getViewer = function() {
   return this._viewer;
 };
 
+// Initialize Entity API (Exposed immediately for destructuring)
+pluginInstance.entity = createEntityApi(pluginInstance);
+
 // Common Entity Management API (Promoted to top-level)
 pluginInstance.get = (id) => pointsManager.getPoint(id);
 pluginInstance.getAll = () => pointsManager.getAllPoints();
 pluginInstance.remove = (idOrPoint) => pointsManager.removePoint(idOrPoint);
 pluginInstance.removeAll = () => pointsManager.removeAllPoints();
 pluginInstance.removeGroup = (groupName) => pointsManager.removeGroup(groupName);
+pluginInstance.showGroup = (groupName) => pointsManager.showGroup(groupName);
+pluginInstance.hideGroup = (groupName) => pointsManager.hideGroup(groupName);
 pluginInstance.updatePosition = (id, position) => pointsManager.updatePointPosition(id, position);
 pluginInstance.select = (idOrPoint) => {
     const point = typeof idOrPoint === 'string' ? pointsManager.getPoint(idOrPoint) : idOrPoint;
@@ -51,39 +54,6 @@ pluginInstance.flyAndOrbit = (position, orientation, duration, cycles) => flyMan
 pluginInstance.getCurrentCamera = () => flyManager.getCurrentCamera();
 pluginInstance.setSurfaceOpacity = (opacity) => flyManager.setSurfaceOpacity(opacity);
 pluginInstance.setDepthTest = (enabled) => flyManager.setDepthTest(enabled);
-
-pluginInstance.point = {
-  add: (options) => addPoint(pluginInstance, options),
-  addMultiple: (list, shared) => addMultiple(pluginInstance, list, shared),
-  get: (id) => pointsManager.getByType(id, 'point'),
-  getAll: () => pointsManager.getAllByType('point'),
-  remove: (idOrPoint) => pointsManager.removePoint(idOrPoint, 'point'), // 仅移除点位类型
-  removeAll: () => pointsManager.removeAllPoints('point'),
-  updatePosition: (id, position) => pointsManager.updatePointPosition(id, position, 'point'),
-  removeGroup: (groupName) => pointsManager.removeGroup(groupName, 'point')
-};
-
-pluginInstance.billboard = {
-  add: (options) => addBillboard(pluginInstance, options),
-  addMultiple: (list, shared) => addMultipleBillboards(pluginInstance, list, shared),
-  get: (id) => pointsManager.getByType(id, 'billboard'),
-  getAll: () => pointsManager.getAllByType('billboard'),
-  remove: (idOrPoint) => pointsManager.removePoint(idOrPoint, 'billboard'),
-  removeAll: () => pointsManager.removeAllPoints('billboard'),
-  updatePosition: (id, position) => pointsManager.updatePointPosition(id, position, 'billboard'),
-  removeGroup: (groupName) => pointsManager.removeGroup(groupName, 'billboard')
-};
-
-pluginInstance.label = {
-  add: (options) => addLabel(pluginInstance, options),
-  addMultiple: (list, shared) => addMultipleLabels(pluginInstance, list, shared),
-  get: (id) => pointsManager.getByType(id, 'label'),
-  getAll: () => pointsManager.getAllByType('label'),
-  remove: (idOrPoint) => pointsManager.removePoint(idOrPoint, 'label'),
-  removeAll: () => pointsManager.removeAllPoints('label'),
-  updatePosition: (id, position) => pointsManager.updatePointPosition(id, position, 'label'),
-  removeGroup: (groupName) => pointsManager.removeGroup(groupName, 'label')
-};
 
 // Export for ES6 modules
 export default pluginInstance;

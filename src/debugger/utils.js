@@ -55,6 +55,7 @@ export function styleInput(input) {
   input.style.padding = '4px 8px';
   input.style.outline = 'none';
   input.style.fontSize = '12px';
+  input.style.boxSizing = 'border-box';
   
   input.onfocus = () => input.style.borderColor = '#3b82f6';
   input.onblur = () => input.style.borderColor = 'rgba(255, 255, 255, 0.2)';
@@ -88,6 +89,7 @@ const translations = {
     flash: '闪烁(毫秒)',
     flashDuration: '周期(ms)',
     copyConfig: '复制配置',
+    copyNative: '复制原生',
     copyChain: '复制链式',
     copied: '已复制!',
     rotation: '旋转角度',
@@ -132,7 +134,33 @@ const translations = {
     pitch: '俯仰角',
     roll: '翻滚角',
     functionArea: '功能区',
-    orbitEarth: '围绕地球 (1秒飞行+3圈旋转)'
+    orbitEarth: '围绕地球 (1秒飞行+3圈旋转)',
+    width: '宽度',
+    height: '高度',
+    sizeInMeters: '单位米',
+    horizontalOrigin: '水平原点',
+    verticalOrigin: '垂直原点',
+    distanceDisplay: '距离显示',
+    scaleByDistance: '按距离缩放',
+    translucencyByDistance: '按距离透明',
+    pixelOffsetScaleByDistance: '按距离偏移',
+    near: '近距离',
+    far: '远距离',
+    nearValue: '近值',
+    farValue: '远值',
+    font: '字体',
+    style: '样式',
+    center: '居中',
+    left: '左',
+    right: '右',
+    top: '上',
+    bottom: '下',
+    baseline: '基线',
+    fill: '填充',
+    outline: '轮廓',
+    fillAndOutline: '填充和轮廓',
+    background: '背景',
+    text: '文本'
   },
   en: {
     title: 'Debugger',
@@ -146,6 +174,7 @@ const translations = {
     flash: 'Flash (ms)',
     flashDuration: 'Period (ms)',
     copyConfig: 'Copy Config',
+    copyNative: 'Copy Native',
     copyChain: 'Copy Chain',
     copied: 'Copied!',
     rotation: 'Rotation',
@@ -190,7 +219,33 @@ const translations = {
     pitch: 'Pitch',
     roll: 'Roll',
     functionArea: 'Functions',
-    orbitEarth: 'Orbit Earth (5s Fly + 3 Cycles)'
+    orbitEarth: 'Orbit Earth (5s Fly + 3 Cycles)',
+    width: 'Width',
+    height: 'Height',
+    sizeInMeters: 'Size in Meters',
+    horizontalOrigin: 'Horiz Origin',
+    verticalOrigin: 'Vert Origin',
+    distanceDisplay: 'Dist Display',
+    scaleByDistance: 'Scale By Dist',
+    translucencyByDistance: 'Trans By Dist',
+    pixelOffsetScaleByDistance: 'Offset Scale By Dist',
+    near: 'Near',
+    far: 'Far',
+    nearValue: 'Near Val',
+    farValue: 'Far Val',
+    font: 'Font',
+    style: 'Style',
+    center: 'Center',
+    left: 'Left',
+    right: 'Right',
+    top: 'Top',
+    bottom: 'Bottom',
+    baseline: 'Baseline',
+    fill: 'Fill',
+    outline: 'Outline',
+    fillAndOutline: 'Fill & Outline',
+    background: 'Background',
+    text: 'Text'
   }
 };
 

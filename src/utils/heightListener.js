@@ -93,6 +93,20 @@ export class HeightListener {
       }
     }
   }
+
+  /**
+   * Get current camera height immediately
+   * @returns {number} Height in meters
+   */
+  getCurrentHeight() {
+    if (!this.viewer || !this.viewer.camera) return 0;
+    
+    if (this.cesium && this.cesium.Cartographic) {
+        const cartographic = this.cesium.Cartographic.fromCartesian(this.viewer.camera.position);
+        return cartographic.height;
+    }
+    return 0;
+  }
 }
 
 // Singleton instance management
