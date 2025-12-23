@@ -136,6 +136,9 @@ export function renderLabelDebugger(container, label, lang = 'zh') {
 
   clampCheck.addEventListener('change', (e) => {
     label.setClampToGround(e.target.checked);
+    if (e.target.checked) {
+      heightInput.value = 0;
+    }
   });
 
   heightInput.addEventListener('input', (e) => {

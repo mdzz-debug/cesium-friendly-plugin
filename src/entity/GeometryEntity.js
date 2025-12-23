@@ -109,6 +109,9 @@ export class GeometryEntity extends BaseEntity {
   setHeightReference(reference) {
     // reference: 'none', 'clampToGround', 'relativeToGround'
     this.heightReference = reference;
+    if (reference === 'clampToGround') {
+      this.heightOffset = 0;
+    }
     this._updateEntityPosition();
     return this;
   }

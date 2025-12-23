@@ -136,6 +136,9 @@ export function renderBillboardDebugger(container, billboard, lang = 'zh') {
 
   clampCheck.addEventListener('change', (e) => {
     billboard.setClampToGround(e.target.checked);
+    if (e.target.checked) {
+      heightInput.value = 0;
+    }
   });
 
   heightInput.addEventListener('input', (e) => {
@@ -684,4 +687,3 @@ export function renderBillboardDebugger(container, billboard, lang = 'zh') {
   btnRow.appendChild(copyChainBtn);
   container.appendChild(btnRow);
 }
-

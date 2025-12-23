@@ -3,6 +3,43 @@ import { createControlRow, colorToHex, createButton, styleInput, t } from './uti
 export function renderPointDebugger(container, point, lang = 'zh') {
   const pos = point.position || [0, 0, 0];
   const groupName = point.group || t('defaultGroup', lang);
+  const labelWidth = lang === 'zh' ? '88px' : '120px';
+  const inputWidth = '140px';
+  const twoColWidth = '240px';
+
+  const tuneRow = (row) => {
+    row.style.justifyContent = 'flex-start';
+    row.style.gap = '10px';
+    return row;
+  };
+
+  const tuneControl = (control) => {
+    control.style.display = 'flex';
+    control.style.gap = '8px';
+    control.style.alignItems = 'center';
+    control.style.flex = '1';
+    control.style.justifyContent = 'flex-end';
+    control.style.flexWrap = 'wrap';
+    control.style.minWidth = '0';
+    control.style.marginLeft = 'auto';
+    return control;
+  };
+
+  const tuneNumberInput = (input, width = inputWidth) => {
+    input.style.flex = `0 1 ${width}`;
+    input.style.width = width;
+    input.style.maxWidth = width;
+    input.style.minWidth = '0';
+    return input;
+  };
+
+  const tuneRangeInput = (input, width = twoColWidth) => {
+    input.style.flex = '0 1 auto';
+    input.style.width = width;
+    input.style.maxWidth = '100%';
+    input.style.minWidth = '0';
+    return input;
+  };
 
   // Info Box (ID, Type, Group, Coords)
   const infoBox = document.createElement('div');
@@ -104,14 +141,37 @@ export function renderPointDebugger(container, point, lang = 'zh') {
   coordsGrid.appendChild(createCoordItem(t('alt', lang), alt.toFixed(2)));
   infoBox.appendChild(coordsGrid);
 
+  const helpBox = document.createElement('div');
+  helpBox.style.cssText = `
+    background: rgba(0,0,0,0.16);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 6px;
+    padding: 10px 10px;
+    color: #94a3b8;
+    font-size: 11px;
+    line-height: 1.5;
+  `;
+  helpBox.innerHTML = lang === 'zh'
+    ? `
+      <div style="color:#e2e8f0; font-weight:600; margin-bottom:6px;">功能说明</div>
+      <div><span style="color:#cbd5e1;">距离显示</span>：按相机到点的距离控制显示（近/远）。</div>
+      <div><span style="color:#cbd5e1;">可见高度</span>：按相机高度范围控制显示（最小/最大）。</div>
+      <div style="margin-top:6px; opacity:0.9;">两者效果都可能表现为“看不见”，但触发条件不同，可叠加使用。</div>
+    `
+    : `
+      <div style="color:#e2e8f0; font-weight:600; margin-bottom:6px;">Notes</div>
+      <div><span style="color:#cbd5e1;">Dist Display</span>: show/hide by camera-to-point distance (near/far).</div>
+      <div><span style="color:#cbd5e1;">Visible Ht</span>: show/hide by camera height range (min/max).</div>
+      <div style="margin-top:6px; opacity:0.9;">Both may “hide” the entity, but the conditions differ and can be combined.</div>
+    `;
+  infoBox.appendChild(helpBox);
+
   container.appendChild(infoBox);
 
   // Height Control (Clamp & Offset)
-  const heightRow = createControlRow(t('height', lang));
+  const heightRow = tuneRow(createControlRow(t('height', lang), labelWidth));
   const heightContainer = document.createElement('div');
-  heightContainer.style.display = 'flex';
-  heightContainer.style.gap = '8px';
-  heightContainer.style.alignItems = 'center';
+  tuneControl(heightContainer);
 
   // Clamp Checkbox
   const clampLabel = document.createElement('label');
@@ -136,13 +196,15 @@ export function renderPointDebugger(container, point, lang = 'zh') {
   heightInput.step = '1';
   heightInput.value = point.heightOffset || 0;
   heightInput.placeholder = t('offset', lang);
-  heightInput.style.flex = '1';
-  heightInput.style.minWidth = '0';
+  tuneNumberInput(heightInput, '120px');
   styleInput(heightInput);
 
   // Events
   clampCheck.addEventListener('change', (e) => {
     point.setClampToGround(e.target.checked);
+    if (e.target.checked) {
+      heightInput.value = 0;
+    }
   });
 
   heightInput.addEventListener('input', (e) => {
@@ -157,11 +219,12 @@ export function renderPointDebugger(container, point, lang = 'zh') {
   container.appendChild(heightRow);
 
   // Color
-  const colorRow = createControlRow(t('color', lang));
+  const colorRow = tuneRow(createControlRow(t('color', lang), labelWidth));
   const colorInput = document.createElement('input');
   colorInput.type = 'color';
   colorInput.value = colorToHex(point.color);
   colorInput.style.cursor = 'pointer';
+  colorInput.style.marginLeft = 'auto';
   colorInput.style.width = '40px';
   colorInput.style.height = '24px';
   colorInput.style.border = 'none';
@@ -174,14 +237,14 @@ export function renderPointDebugger(container, point, lang = 'zh') {
   container.appendChild(colorRow);
 
   // Pixel Size
-  const sizeRow = createControlRow(`${t('pixelSize', lang)} (px)`);
+  const sizeRow = tuneRow(createControlRow(`${t('pixelSize', lang)} (px)`, labelWidth));
   const sizeInput = document.createElement('input');
   sizeInput.type = 'number';
   sizeInput.min = '1';
   sizeInput.max = '100';
   sizeInput.value = point.pixelSize;
-  sizeInput.style.flex = '1';
-  sizeInput.style.minWidth = '0';
+  tuneNumberInput(sizeInput);
+  sizeInput.style.marginLeft = 'auto';
   styleInput(sizeInput);
   sizeInput.addEventListener('input', (e) => {
     const val = parseInt(e.target.value);
@@ -193,15 +256,15 @@ export function renderPointDebugger(container, point, lang = 'zh') {
   container.appendChild(sizeRow);
 
   // Opacity
-  const opacityRow = createControlRow(t('opacity', lang));
+  const opacityRow = tuneRow(createControlRow(t('opacity', lang), labelWidth));
   const opacityInput = document.createElement('input');
   opacityInput.type = 'range';
   opacityInput.min = '0';
   opacityInput.max = '1';
   opacityInput.step = '0.1';
   opacityInput.value = point.opacity;
-  opacityInput.style.flex = '1';
-  opacityInput.style.minWidth = '0';
+  tuneRangeInput(opacityInput);
+  opacityInput.style.marginLeft = 'auto';
   opacityInput.style.cursor = 'pointer';
   opacityInput.addEventListener('input', (e) => {
     const val = parseFloat(e.target.value);
@@ -210,12 +273,47 @@ export function renderPointDebugger(container, point, lang = 'zh') {
   opacityRow.appendChild(opacityInput);
   container.appendChild(opacityRow);
 
+  // Flash
+  const flashRow = tuneRow(createControlRow(t('flash', lang), labelWidth));
+  const flashContainer = document.createElement('div');
+  tuneControl(flashContainer);
+  flashContainer.style.gap = '6px';
+
+  const flashCheck = document.createElement('input');
+  flashCheck.type = 'checkbox';
+  flashCheck.checked = !!point._flashing;
+  flashCheck.style.cursor = 'pointer';
+
+  const flashDurationInput = document.createElement('input');
+  flashDurationInput.type = 'number';
+  flashDurationInput.min = '50';
+  flashDurationInput.step = '50';
+  flashDurationInput.placeholder = t('flashDuration', lang);
+  flashDurationInput.value = Number.isFinite(point._debugFlashDuration) ? point._debugFlashDuration : 1000;
+  tuneNumberInput(flashDurationInput, '120px');
+  styleInput(flashDurationInput);
+
+  const applyFlash = () => {
+    const duration = Math.max(50, parseInt(flashDurationInput.value || '1000', 10) || 1000);
+    point._debugFlashDuration = duration;
+    point.flash(!!flashCheck.checked, duration);
+  };
+
+  flashCheck.addEventListener('change', applyFlash);
+  flashDurationInput.addEventListener('input', () => {
+    if (!flashCheck.checked) return;
+    applyFlash();
+  });
+
+  flashContainer.appendChild(flashCheck);
+  flashContainer.appendChild(flashDurationInput);
+  flashRow.appendChild(flashContainer);
+  container.appendChild(flashRow);
+
   // Outline Control
-  const outlineRow = createControlRow(t('outline', lang));
+  const outlineRow = tuneRow(createControlRow(t('outline', lang), labelWidth));
   const outlineContainer = document.createElement('div');
-  outlineContainer.style.display = 'flex';
-  outlineContainer.style.gap = '8px';
-  outlineContainer.style.alignItems = 'center';
+  tuneControl(outlineContainer);
 
   const outlineCheck = document.createElement('input');
   outlineCheck.type = 'checkbox';
@@ -259,25 +357,23 @@ export function renderPointDebugger(container, point, lang = 'zh') {
   container.appendChild(outlineRow);
 
   // Distance Display
-  const distanceRow = createControlRow(t('distanceDisplay', lang));
+  const distanceRow = tuneRow(createControlRow(t('distanceDisplay', lang), labelWidth));
   const distanceContainer = document.createElement('div');
-  distanceContainer.style.display = 'flex';
-  distanceContainer.style.gap = '4px';
+  tuneControl(distanceContainer);
+  distanceContainer.style.gap = '6px';
 
   const nearInput = document.createElement('input');
   nearInput.type = 'number';
   nearInput.placeholder = t('near', lang);
   nearInput.value = point.distanceDisplayCondition ? point.distanceDisplayCondition.near : 0;
-  nearInput.style.flex = '1';
-  nearInput.style.minWidth = '0';
+  tuneNumberInput(nearInput, '110px');
   styleInput(nearInput);
 
   const farInput = document.createElement('input');
   farInput.type = 'number';
   farInput.placeholder = t('far', lang);
   farInput.value = point.distanceDisplayCondition ? point.distanceDisplayCondition.far : '';
-  farInput.style.flex = '1';
-  farInput.style.minWidth = '0';
+  tuneNumberInput(farInput, '110px');
   styleInput(farInput);
 
   const updateDistance = () => {
@@ -294,17 +390,21 @@ export function renderPointDebugger(container, point, lang = 'zh') {
   container.appendChild(distanceRow);
 
   // Scale By Distance
-  const scaleDistRow = createControlRow(t('scaleByDistance', lang));
+  const scaleDistRow = tuneRow(createControlRow(t('scaleByDistance', lang), labelWidth));
   const scaleDistContainer = document.createElement('div');
   scaleDistContainer.style.display = 'grid';
-  scaleDistContainer.style.gridTemplateColumns = '1fr 1fr';
-  scaleDistContainer.style.gap = '4px';
+  scaleDistContainer.style.gridTemplateColumns = 'minmax(0, 110px) minmax(0, 110px)';
+  scaleDistContainer.style.gap = '6px';
+  scaleDistContainer.style.width = twoColWidth;
+  scaleDistContainer.style.maxWidth = '100%';
+  scaleDistContainer.style.justifyContent = 'end';
+  scaleDistContainer.style.marginLeft = 'auto';
 
   const snInput = document.createElement('input');
   snInput.type = 'number';
   snInput.placeholder = t('near', lang);
   snInput.value = point.scaleByDistance ? point.scaleByDistance.near : '';
-  snInput.style.flex = '1';
+  snInput.style.width = '100%';
   snInput.style.minWidth = '0';
   styleInput(snInput);
 
@@ -312,7 +412,7 @@ export function renderPointDebugger(container, point, lang = 'zh') {
   snvInput.type = 'number';
   snvInput.placeholder = t('nearValue', lang);
   snvInput.value = point.scaleByDistance ? point.scaleByDistance.nearValue : '';
-  snvInput.style.flex = '1';
+  snvInput.style.width = '100%';
   snvInput.style.minWidth = '0';
   styleInput(snvInput);
 
@@ -320,7 +420,7 @@ export function renderPointDebugger(container, point, lang = 'zh') {
   sfInput.type = 'number';
   sfInput.placeholder = t('far', lang);
   sfInput.value = point.scaleByDistance ? point.scaleByDistance.far : '';
-  sfInput.style.flex = '1';
+  sfInput.style.width = '100%';
   sfInput.style.minWidth = '0';
   styleInput(sfInput);
 
@@ -328,7 +428,7 @@ export function renderPointDebugger(container, point, lang = 'zh') {
   sfvInput.type = 'number';
   sfvInput.placeholder = t('farValue', lang);
   sfvInput.value = point.scaleByDistance ? point.scaleByDistance.farValue : '';
-  sfvInput.style.flex = '1';
+  sfvInput.style.width = '100%';
   sfvInput.style.minWidth = '0';
   styleInput(sfvInput);
 
@@ -354,17 +454,21 @@ export function renderPointDebugger(container, point, lang = 'zh') {
   container.appendChild(scaleDistRow);
 
   // Translucency By Distance
-  const transDistRow = createControlRow(t('translucencyByDistance', lang));
+  const transDistRow = tuneRow(createControlRow(t('translucencyByDistance', lang), labelWidth));
   const transDistContainer = document.createElement('div');
   transDistContainer.style.display = 'grid';
-  transDistContainer.style.gridTemplateColumns = '1fr 1fr';
-  transDistContainer.style.gap = '4px';
+  transDistContainer.style.gridTemplateColumns = 'minmax(0, 110px) minmax(0, 110px)';
+  transDistContainer.style.gap = '6px';
+  transDistContainer.style.width = twoColWidth;
+  transDistContainer.style.maxWidth = '100%';
+  transDistContainer.style.justifyContent = 'end';
+  transDistContainer.style.marginLeft = 'auto';
 
   const tnInput = document.createElement('input');
   tnInput.type = 'number';
   tnInput.placeholder = t('near', lang);
   tnInput.value = point.translucencyByDistance ? point.translucencyByDistance.near : '';
-  tnInput.style.flex = '1';
+  tnInput.style.width = '100%';
   tnInput.style.minWidth = '0';
   styleInput(tnInput);
 
@@ -372,7 +476,7 @@ export function renderPointDebugger(container, point, lang = 'zh') {
   tnvInput.type = 'number';
   tnvInput.placeholder = t('nearValue', lang);
   tnvInput.value = point.translucencyByDistance ? point.translucencyByDistance.nearValue : '';
-  tnvInput.style.flex = '1';
+  tnvInput.style.width = '100%';
   tnvInput.style.minWidth = '0';
   styleInput(tnvInput);
 
@@ -380,7 +484,7 @@ export function renderPointDebugger(container, point, lang = 'zh') {
   tfInput.type = 'number';
   tfInput.placeholder = t('far', lang);
   tfInput.value = point.translucencyByDistance ? point.translucencyByDistance.far : '';
-  tfInput.style.flex = '1';
+  tfInput.style.width = '100%';
   tfInput.style.minWidth = '0';
   styleInput(tfInput);
 
@@ -388,7 +492,7 @@ export function renderPointDebugger(container, point, lang = 'zh') {
   tfvInput.type = 'number';
   tfvInput.placeholder = t('farValue', lang);
   tfvInput.value = point.translucencyByDistance ? point.translucencyByDistance.farValue : '';
-  tfvInput.style.flex = '1';
+  tfvInput.style.width = '100%';
   tfvInput.style.minWidth = '0';
   styleInput(tfvInput);
 
@@ -414,11 +518,10 @@ export function renderPointDebugger(container, point, lang = 'zh') {
   container.appendChild(transDistRow);
 
   // Disable Depth Test Distance
-  const depthTestRow = createControlRow(t('depthTest', lang));
+  const depthTestRow = tuneRow(createControlRow(t('depthTest', lang), labelWidth));
   const depthTestContainer = document.createElement('div');
-  depthTestContainer.style.display = 'flex';
-  depthTestContainer.style.gap = '8px';
-  depthTestContainer.style.alignItems = 'center';
+  tuneControl(depthTestContainer);
+  depthTestContainer.style.justifyContent = 'flex-end';
 
   const depthTestCheck = document.createElement('input');
   depthTestCheck.type = 'checkbox';
@@ -439,6 +542,40 @@ export function renderPointDebugger(container, point, lang = 'zh') {
   depthTestContainer.appendChild(depthTestLabel);
   depthTestRow.appendChild(depthTestContainer);
   container.appendChild(depthTestRow);
+
+  // Display Height
+  const displayHeightRow = tuneRow(createControlRow(t('displayHeight', lang), labelWidth));
+  const displayHeightContainer = document.createElement('div');
+  tuneControl(displayHeightContainer);
+  displayHeightContainer.style.gap = '6px';
+
+  const minHeightInput = document.createElement('input');
+  minHeightInput.type = 'number';
+  minHeightInput.placeholder = t('min', lang);
+  minHeightInput.value = point.minDisplayHeight || 0;
+  tuneNumberInput(minHeightInput, '110px');
+  styleInput(minHeightInput);
+
+  const maxHeightInput = document.createElement('input');
+  maxHeightInput.type = 'number';
+  maxHeightInput.placeholder = t('max', lang);
+  maxHeightInput.value = Number.isFinite(point.maxDisplayHeight) ? point.maxDisplayHeight : '';
+  tuneNumberInput(maxHeightInput, '110px');
+  styleInput(maxHeightInput);
+
+  const updateDisplayHeight = () => {
+    const minVal = parseFloat(minHeightInput.value);
+    const maxVal = parseFloat(maxHeightInput.value);
+    point.setDisplayCondition(isNaN(minVal) ? 0 : minVal, isNaN(maxVal) ? 0 : maxVal);
+  };
+
+  minHeightInput.addEventListener('input', updateDisplayHeight);
+  maxHeightInput.addEventListener('input', updateDisplayHeight);
+
+  displayHeightContainer.appendChild(minHeightInput);
+  displayHeightContainer.appendChild(maxHeightInput);
+  displayHeightRow.appendChild(displayHeightContainer);
+  container.appendChild(displayHeightRow);
 
   // Copy Config Buttons
   const btnRow = document.createElement('div');
@@ -526,7 +663,19 @@ export function renderPointDebugger(container, point, lang = 'zh') {
         chain += `,\n  disableDepthTestDistance: true`;
     }
 
+    if (point.minDisplayHeight && point.minDisplayHeight !== 0) {
+        chain += `,\n  minDisplayHeight: ${point.minDisplayHeight}`;
+    }
+    if (Number.isFinite(point.maxDisplayHeight) && point.maxDisplayHeight !== Infinity) {
+        chain += `,\n  maxDisplayHeight: ${point.maxDisplayHeight}`;
+    }
+
     chain += `\n})`;
+
+    if (point._flashing) {
+      const d = Number.isFinite(point._debugFlashDuration) ? point._debugFlashDuration : 1000;
+      chain += `\n.flash(true, ${d})`;
+    }
 
     navigator.clipboard.writeText(chain)
       .then(() => {

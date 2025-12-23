@@ -15,6 +15,7 @@ class Debugger {
     this.lang = 'zh'; // Default language
     this._boundOnRightClick = this._onRightClick.bind(this);
     this.titleEl = null;
+    this.headerEl = null;
     this.svgContainer = null;
     this.connectorPath = null;
     this.connectorPoint = null;
@@ -23,6 +24,33 @@ class Debugger {
 
   init() {
     if (this.container) return;
+
+    if (!document.getElementById('cesium-friendly-debugger-styles')) {
+      const styleEl = document.createElement('style');
+      styleEl.id = 'cesium-friendly-debugger-styles';
+      styleEl.textContent = `
+        #cesium-friendly-debugger {
+          scrollbar-width: thin;
+          scrollbar-color: rgba(148, 163, 184, 0.45) rgba(255, 255, 255, 0.06);
+        }
+        #cesium-friendly-debugger::-webkit-scrollbar {
+          width: 10px;
+        }
+        #cesium-friendly-debugger::-webkit-scrollbar-track {
+          background: rgba(255, 255, 255, 0.06);
+          border-radius: 999px;
+        }
+        #cesium-friendly-debugger::-webkit-scrollbar-thumb {
+          background: rgba(148, 163, 184, 0.45);
+          border-radius: 999px;
+          border: 2px solid rgba(255, 255, 255, 0.06);
+        }
+        #cesium-friendly-debugger::-webkit-scrollbar-thumb:hover {
+          background: rgba(226, 232, 240, 0.55);
+        }
+      `;
+      document.head.appendChild(styleEl);
+    }
 
     // Create SVG Overlay
     this.svgContainer = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -52,7 +80,9 @@ class Debugger {
     this.connectorPoint.setAttribute('fill', 'rgba(15, 23, 42, 0.85)');
     this.connectorPoint.setAttribute('stroke', '#38bdf8');
     this.connectorPoint.setAttribute('stroke-width', '2');
+    this.connectorPoint.style.display = 'none';
     this.svgContainer.appendChild(this.connectorPoint);
+    this.connectorPath.style.display = 'none';
 
     document.body.appendChild(this.svgContainer);
 
@@ -82,13 +112,20 @@ class Debugger {
 
     // Title & Close Button Container
     const header = document.createElement('div');
+    this.headerEl = header;
     header.style.cssText = `
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 20px;
-      padding-bottom: 12px;
+      margin: -24px -24px 20px;
+      padding: 24px 24px 12px;
       border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      position: sticky;
+      z-index: 2;
+      top: -25px;
+      background: rgba(15, 23, 42, 0.35);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
     `;
     this.container.appendChild(header);
 
@@ -241,6 +278,11 @@ class Debugger {
     }
 
     const updateLine = () => {
+        if (this.currentPoint !== target) {
+            if (this.connectorPath) this.connectorPath.style.display = 'none';
+            if (this.connectorPoint) this.connectorPoint.style.display = 'none';
+            return;
+        }
         if (!this.container || this.container.style.display === 'none') {
             if (this.connectorPath) this.connectorPath.style.display = 'none';
             if (this.connectorPoint) this.connectorPoint.style.display = 'none';
@@ -256,9 +298,15 @@ class Debugger {
         }
 
         // Validate coordinates
-        let lng = pos.lng || pos[0];
-        let lat = pos.lat || pos[1];
-        let alt = pos.alt || pos[2] || 0;
+        let lng = pos.lng ?? pos[0];
+        let lat = pos.lat ?? pos[1];
+        const absAlt = pos.alt ?? pos[2] ?? 0;
+        const heightOffset = typeof target.heightOffset === 'number' ? target.heightOffset : 0;
+        const hasHeightOffset = heightOffset !== 0;
+        const heightReference = target.heightReference === 'relativeToGround' || (target.heightReference === 'clampToGround' && hasHeightOffset)
+          ? 'relativeToGround'
+          : (target.heightReference || 'none');
+        let alt = 0;
 
         if (typeof lng !== 'number' || typeof lat !== 'number') {
              if (this.connectorPath) this.connectorPath.style.display = 'none';
@@ -267,16 +315,22 @@ class Debugger {
         }
 
         // Handle height reference (clampToGround / relativeToGround)
-        if ((target.heightReference === 'clampToGround' || target.heightReference === 'relativeToGround') && scene.globe) {
+        if ((heightReference === 'clampToGround' || heightReference === 'relativeToGround') && scene.globe) {
             const cartographic = Cesium.Cartographic.fromDegrees(lng, lat);
             const terrainHeight = scene.globe.getHeight(cartographic);
             if (terrainHeight !== undefined) {
-                if (target.heightReference === 'clampToGround') {
+                if (heightReference === 'clampToGround') {
                     alt = terrainHeight;
                 } else {
-                    alt = terrainHeight + alt;
+                    alt = terrainHeight + heightOffset;
                 }
+            } else {
+                alt = heightReference === 'relativeToGround' ? heightOffset : 0;
             }
+        } else if (heightReference === 'relativeToGround') {
+            alt = heightOffset;
+        } else {
+            alt = absAlt + heightOffset;
         }
 
         const cartesian = Cesium.Cartesian3.fromDegrees(lng, lat, alt);
@@ -297,7 +351,8 @@ class Debugger {
         // 2. Get Panel Position (Left Edge Center)
         const panelRect = this.container.getBoundingClientRect();
         const panelX = panelRect.left;
-        const panelY = panelRect.top + 45; // Align with title
+        const headerRect = this.headerEl ? this.headerEl.getBoundingClientRect() : null;
+        const panelY = headerRect ? (headerRect.top + headerRect.height / 2) : (panelRect.top + 45);
         
         // 3. Draw Curve
         const p1 = { x: screenPos.x, y: screenPos.y };
