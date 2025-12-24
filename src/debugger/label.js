@@ -3,6 +3,73 @@ import { createControlRow, colorToHex, createButton, styleInput, t } from './uti
 export function renderLabelDebugger(container, label, lang = 'zh') {
   const pos = label.position || [0, 0, 0];
   const groupName = label.group || t('defaultGroup', lang);
+  const labelWidth = lang === 'zh' ? '88px' : '120px';
+  const inputWidth = '140px';
+  const twoColWidth = '240px';
+
+  const tuneRow = (row) => {
+    row.style.justifyContent = 'flex-start';
+    row.style.gap = '10px';
+    return row;
+  };
+
+  const tuneControl = (control) => {
+    control.style.display = 'flex';
+    control.style.gap = '8px';
+    control.style.alignItems = 'center';
+    control.style.flex = '1';
+    control.style.justifyContent = 'flex-end';
+    control.style.flexWrap = 'wrap';
+    control.style.minWidth = '0';
+    control.style.marginLeft = 'auto';
+    return control;
+  };
+
+  const tuneNumberInput = (input, width = inputWidth) => {
+    input.style.flex = `0 1 ${width}`;
+    input.style.width = width;
+    input.style.maxWidth = width;
+    input.style.minWidth = '0';
+    return input;
+  };
+
+  const tuneWideInput = (input, width = twoColWidth) => {
+    input.style.flex = `0 1 ${width}`;
+    input.style.width = width;
+    input.style.maxWidth = '100%';
+    input.style.minWidth = '0';
+    return input;
+  };
+
+  const tuneGridInput = (input) => {
+    input.style.width = '100%';
+    input.style.minWidth = '0';
+    return input;
+  };
+
+  const createTwoColGrid = () => {
+    const grid = document.createElement('div');
+    grid.style.display = 'grid';
+    grid.style.gridTemplateColumns = 'minmax(0, 110px) minmax(0, 110px)';
+    grid.style.gap = '6px';
+    grid.style.width = twoColWidth;
+    grid.style.maxWidth = '100%';
+    grid.style.justifyContent = 'end';
+    grid.style.marginLeft = 'auto';
+    return grid;
+  };
+
+  const createThreeColGrid = () => {
+    const grid = document.createElement('div');
+    grid.style.display = 'grid';
+    grid.style.gridTemplateColumns = 'minmax(0, 74px) minmax(0, 74px) minmax(0, 74px)';
+    grid.style.gap = '6px';
+    grid.style.width = twoColWidth;
+    grid.style.maxWidth = '100%';
+    grid.style.justifyContent = 'end';
+    grid.style.marginLeft = 'auto';
+    return grid;
+  };
 
   // Info Box
   const infoBox = document.createElement('div');
@@ -40,6 +107,7 @@ export function renderLabelDebugger(container, label, lang = 'zh') {
 
   const groupBadge = document.createElement('div');
   groupBadge.textContent = groupName;
+  groupBadge.title = t('group', lang);
   groupBadge.style.cssText = `
     padding: 2px 8px;
     background: rgba(56, 189, 248, 0.15);
@@ -55,6 +123,7 @@ export function renderLabelDebugger(container, label, lang = 'zh') {
   // ID Row
   const idRow = document.createElement('div');
   idRow.textContent = label.id;
+  idRow.title = label.id;
   idRow.style.cssText = `
     color: #94a3b8;
     font-size: 11px;
@@ -100,14 +169,37 @@ export function renderLabelDebugger(container, label, lang = 'zh') {
   coordsGrid.appendChild(createCoordItem(t('alt', lang), alt.toFixed(2)));
   infoBox.appendChild(coordsGrid);
 
+  const helpBox = document.createElement('div');
+  helpBox.style.cssText = `
+    background: rgba(0,0,0,0.16);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 6px;
+    padding: 10px 10px;
+    color: #94a3b8;
+    font-size: 11px;
+    line-height: 1.5;
+  `;
+  helpBox.innerHTML = lang === 'zh'
+    ? `
+      <div style="color:#e2e8f0; font-weight:600; margin-bottom:6px;">功能说明</div>
+      <div><span style="color:#cbd5e1;">距离显示</span>：按相机到标签的距离控制显示（近/远）。</div>
+      <div><span style="color:#cbd5e1;">可见高度</span>：按相机高度范围控制显示（最小/最大）。</div>
+      <div style="margin-top:6px; opacity:0.9;">两者效果都可能表现为“看不见”，但触发条件不同，可叠加使用。</div>
+    `
+    : `
+      <div style="color:#e2e8f0; font-weight:600; margin-bottom:6px;">Notes</div>
+      <div><span style="color:#cbd5e1;">Dist Display</span>: show/hide by camera-to-label distance (near/far).</div>
+      <div><span style="color:#cbd5e1;">Visible Ht</span>: show/hide by camera height range (min/max).</div>
+      <div style="margin-top:6px; opacity:0.9;">Both may “hide” the entity, but the conditions differ and can be combined.</div>
+    `;
+  infoBox.appendChild(helpBox);
+
   container.appendChild(infoBox);
 
   // Height Control
-  const heightRow = createControlRow(t('height', lang));
+  const heightRow = tuneRow(createControlRow(t('height', lang), labelWidth));
   const heightContainer = document.createElement('div');
-  heightContainer.style.display = 'flex';
-  heightContainer.style.gap = '8px';
-  heightContainer.style.alignItems = 'center';
+  tuneControl(heightContainer);
 
   const clampLabel = document.createElement('label');
   clampLabel.style.display = 'flex';
@@ -130,8 +222,7 @@ export function renderLabelDebugger(container, label, lang = 'zh') {
   heightInput.step = '1';
   heightInput.value = label.heightOffset || 0;
   heightInput.placeholder = t('offset', lang);
-  heightInput.style.flex = '1';
-  heightInput.style.minWidth = '0';
+  tuneNumberInput(heightInput, '120px');
   styleInput(heightInput);
 
   clampCheck.addEventListener('change', (e) => {
@@ -153,35 +244,74 @@ export function renderLabelDebugger(container, label, lang = 'zh') {
   container.appendChild(heightRow);
 
   // Text Content
-  const textRow = createControlRow(t('text', lang));
+  const textRow = tuneRow(createControlRow(t('text', lang), labelWidth));
+  const textContainer = document.createElement('div');
+  tuneControl(textContainer);
   const textInput = document.createElement('input');
   textInput.type = 'text';
   textInput.value = label.text;
-  textInput.style.width = '100%';
+  tuneWideInput(textInput);
   styleInput(textInput);
   textInput.addEventListener('input', (e) => {
     label.setText(e.target.value);
   });
-  textRow.appendChild(textInput);
+  textContainer.appendChild(textInput);
+  textRow.appendChild(textContainer);
   container.appendChild(textRow);
 
   // Font
-  const fontRow = createControlRow(t('font', lang));
+  const fontRow = tuneRow(createControlRow(t('font', lang), labelWidth));
+  const fontContainer = document.createElement('div');
+  tuneControl(fontContainer);
   const fontInput = document.createElement('input');
   fontInput.type = 'text';
   fontInput.value = label.font;
   fontInput.placeholder = '30px sans-serif';
-  fontInput.style.flex = '1';
-  fontInput.style.minWidth = '0';
+  tuneWideInput(fontInput);
   styleInput(fontInput);
   fontInput.addEventListener('change', (e) => {
     label.setFont(e.target.value);
   });
-  fontRow.appendChild(fontInput);
+  fontContainer.appendChild(fontInput);
+  fontRow.appendChild(fontContainer);
   container.appendChild(fontRow);
 
+  // Font Size
+  const fontSizeRow = tuneRow(createControlRow(lang === 'zh' ? '字号 (px)' : 'Font Size (px)', labelWidth));
+  const fontSizeInput = document.createElement('input');
+  fontSizeInput.type = 'number';
+  fontSizeInput.step = '1';
+  fontSizeInput.min = '1';
+  fontSizeInput.value = label.fontSize || 14;
+  tuneNumberInput(fontSizeInput, '120px');
+  fontSizeInput.style.marginLeft = 'auto';
+  styleInput(fontSizeInput);
+  fontSizeInput.addEventListener('input', (e) => {
+    const val = parseInt(e.target.value, 10);
+    if (!isNaN(val) && val > 0) {
+      label.setFontSize(val);
+    }
+  });
+  fontSizeRow.appendChild(fontSizeInput);
+  container.appendChild(fontSizeRow);
+
+  // Bold
+  const boldRow = tuneRow(createControlRow(t('bold', lang), labelWidth));
+  const boldCheck = document.createElement('input');
+  boldCheck.type = 'checkbox';
+  boldCheck.checked = !!label.bold;
+  boldCheck.style.marginLeft = 'auto';
+  boldCheck.style.cursor = 'pointer';
+  boldCheck.addEventListener('change', (e) => {
+    label.setBold(!!e.target.checked);
+  });
+  boldRow.appendChild(boldCheck);
+  container.appendChild(boldRow);
+
   // Style
-  const styleRow = createControlRow(t('style', lang));
+  const styleRow = tuneRow(createControlRow(t('style', lang), labelWidth));
+  const styleContainer = document.createElement('div');
+  tuneControl(styleContainer);
   const styleSel = document.createElement('select');
   ['FILL', 'OUTLINE', 'FILL_AND_OUTLINE'].forEach(s => {
       const opt = document.createElement('option');
@@ -190,48 +320,48 @@ export function renderLabelDebugger(container, label, lang = 'zh') {
       if (label.style === s) opt.selected = true;
       styleSel.appendChild(opt);
   });
-  styleSel.style.flex = '1';
-  styleSel.style.minWidth = '0';
+  tuneWideInput(styleSel);
   styleInput(styleSel);
   styleSel.addEventListener('change', (e) => label.setStyle(e.target.value));
-  styleRow.appendChild(styleSel);
+  styleContainer.appendChild(styleSel);
+  styleRow.appendChild(styleContainer);
   container.appendChild(styleRow);
 
   // Colors (Fill & Outline)
-  const colorRow = createControlRow(t('color', lang));
+  const colorRow = tuneRow(createControlRow(t('color', lang), labelWidth));
   const colorContainer = document.createElement('div');
-  colorContainer.style.display = 'flex';
-  colorContainer.style.gap = '8px';
-  colorContainer.style.alignItems = 'center';
+  tuneControl(colorContainer);
+  colorContainer.style.gap = '6px';
 
   const fillColorInput = document.createElement('input');
   fillColorInput.type = 'color';
-  fillColorInput.value = colorToHex(label.fillColor);
+  fillColorInput.value = colorToHex(label.color || label.fillColor);
   fillColorInput.style.width = '30px';
   fillColorInput.style.height = '20px';
   fillColorInput.style.border = 'none';
   fillColorInput.style.padding = '0';
   fillColorInput.style.background = 'transparent';
   fillColorInput.title = 'Fill Color';
-  fillColorInput.addEventListener('input', (e) => label.setFillColor(e.target.value));
+  fillColorInput.style.cursor = 'pointer';
+  fillColorInput.addEventListener('input', (e) => label.setColor(e.target.value));
 
   const outlineColorInput = document.createElement('input');
   outlineColorInput.type = 'color';
-  outlineColorInput.value = colorToHex(label.outlineColor);
+  outlineColorInput.value = colorToHex(label.outlineColor || '#000000');
   outlineColorInput.style.width = '30px';
   outlineColorInput.style.height = '20px';
   outlineColorInput.style.border = 'none';
   outlineColorInput.style.padding = '0';
   outlineColorInput.style.background = 'transparent';
   outlineColorInput.title = 'Outline Color';
+  outlineColorInput.style.cursor = 'pointer';
   outlineColorInput.addEventListener('input', (e) => label.setOutlineColor(e.target.value));
 
   const outlineWidthInput = document.createElement('input');
   outlineWidthInput.type = 'number';
   outlineWidthInput.min = '1';
-  outlineWidthInput.value = label.outlineWidth || 1;
-  outlineWidthInput.style.flex = '1';
-  outlineWidthInput.style.minWidth = '0';
+  outlineWidthInput.value = label.outlineWidth || 2;
+  tuneNumberInput(outlineWidthInput, '110px');
   styleInput(outlineWidthInput);
   outlineWidthInput.addEventListener('input', (e) => label.setOutlineWidth(parseFloat(e.target.value)));
 
@@ -242,16 +372,18 @@ export function renderLabelDebugger(container, label, lang = 'zh') {
   container.appendChild(colorRow);
 
   // Background
-  const bgRow = createControlRow(t('background', lang));
+  const bgRow = tuneRow(createControlRow(t('background', lang), labelWidth));
   const bgContainer = document.createElement('div');
-  bgContainer.style.display = 'flex';
-  bgContainer.style.gap = '8px';
-  bgContainer.style.alignItems = 'center';
+  tuneControl(bgContainer);
+  bgContainer.style.gap = '6px';
 
   const bgCheck = document.createElement('input');
   bgCheck.type = 'checkbox';
   bgCheck.checked = label.showBackground;
-  bgCheck.addEventListener('change', (e) => label.setShowBackground(e.target.checked));
+  bgCheck.style.cursor = 'pointer';
+  bgCheck.addEventListener('change', (e) => {
+    label.setBackgroundColor(e.target.checked ? bgColorInput.value : null);
+  });
 
   const bgColorInput = document.createElement('input');
   bgColorInput.type = 'color';
@@ -261,7 +393,11 @@ export function renderLabelDebugger(container, label, lang = 'zh') {
   bgColorInput.style.border = 'none';
   bgColorInput.style.padding = '0';
   bgColorInput.style.background = 'transparent';
-  bgColorInput.addEventListener('input', (e) => label.setBackgroundColor(e.target.value));
+  bgColorInput.style.cursor = 'pointer';
+  bgColorInput.addEventListener('input', (e) => {
+    if (!bgCheck.checked) return;
+    label.setBackgroundColor(e.target.value);
+  });
 
   bgContainer.appendChild(bgCheck);
   bgContainer.appendChild(bgColorInput);
@@ -269,14 +405,14 @@ export function renderLabelDebugger(container, label, lang = 'zh') {
   container.appendChild(bgRow);
 
   // Scale
-  const scaleRow = createControlRow(t('scale', lang));
+  const scaleRow = tuneRow(createControlRow(t('scale', lang), labelWidth));
   const scaleInput = document.createElement('input');
   scaleInput.type = 'number';
   scaleInput.step = '0.1';
   scaleInput.min = '0.1';
   scaleInput.value = label.scale || 1.0;
-  scaleInput.style.flex = '1';
-  scaleInput.style.minWidth = '0';
+  tuneNumberInput(scaleInput, '120px');
+  scaleInput.style.marginLeft = 'auto';
   styleInput(scaleInput);
   scaleInput.addEventListener('input', (e) => {
     const val = parseFloat(e.target.value);
@@ -288,10 +424,8 @@ export function renderLabelDebugger(container, label, lang = 'zh') {
   container.appendChild(scaleRow);
 
   // Origins
-  const originRow = createControlRow(`${t('horizontalOrigin', lang)} / ${t('verticalOrigin', lang)}`);
-  const originContainer = document.createElement('div');
-  originContainer.style.display = 'flex';
-  originContainer.style.gap = '4px';
+  const originRow = tuneRow(createControlRow(`${t('horizontalOrigin', lang)} / ${t('verticalOrigin', lang)}`, labelWidth));
+  const originContainer = createTwoColGrid();
 
   const hOriginSel = document.createElement('select');
   ['CENTER', 'LEFT', 'RIGHT'].forEach(o => {
@@ -301,8 +435,7 @@ export function renderLabelDebugger(container, label, lang = 'zh') {
       if (label.horizontalOrigin === o) opt.selected = true;
       hOriginSel.appendChild(opt);
   });
-  hOriginSel.style.flex = '1';
-  hOriginSel.style.minWidth = '0';
+  tuneGridInput(hOriginSel);
   styleInput(hOriginSel);
   hOriginSel.addEventListener('change', (e) => label.setHorizontalOrigin(e.target.value));
 
@@ -314,8 +447,7 @@ export function renderLabelDebugger(container, label, lang = 'zh') {
       if (label.verticalOrigin === o) opt.selected = true;
       vOriginSel.appendChild(opt);
   });
-  vOriginSel.style.flex = '1';
-  vOriginSel.style.minWidth = '0';
+  tuneGridInput(vOriginSel);
   styleInput(vOriginSel);
   vOriginSel.addEventListener('change', (e) => label.setVerticalOrigin(e.target.value));
 
@@ -325,25 +457,21 @@ export function renderLabelDebugger(container, label, lang = 'zh') {
   container.appendChild(originRow);
 
   // Pixel Offset
-  const pixelOffsetRow = createControlRow(t('pixelOffset', lang));
-  const pixelOffsetContainer = document.createElement('div');
-  pixelOffsetContainer.style.display = 'flex';
-  pixelOffsetContainer.style.gap = '4px';
+  const pixelOffsetRow = tuneRow(createControlRow(t('pixelOffset', lang), labelWidth));
+  const pixelOffsetContainer = createTwoColGrid();
 
   const pxInput = document.createElement('input');
   pxInput.type = 'number';
   pxInput.placeholder = 'X';
   pxInput.value = label.pixelOffset ? label.pixelOffset[0] : 0;
-  pxInput.style.flex = '1';
-  pxInput.style.maxWidth = '60px';
+  tuneGridInput(pxInput);
   styleInput(pxInput);
 
   const pyInput = document.createElement('input');
   pyInput.type = 'number';
   pyInput.placeholder = 'Y';
   pyInput.value = label.pixelOffset ? label.pixelOffset[1] : 0;
-  pyInput.style.flex = '1';
-  pyInput.style.maxWidth = '60px';
+  tuneGridInput(pyInput);
   styleInput(pyInput);
 
   const updatePixelOffset = () => {
@@ -360,33 +488,28 @@ export function renderLabelDebugger(container, label, lang = 'zh') {
   container.appendChild(pixelOffsetRow);
 
   // Eye Offset
-  const eyeOffsetRow = createControlRow(t('eyeOffset', lang));
-  const eyeOffsetContainer = document.createElement('div');
-  eyeOffsetContainer.style.display = 'flex';
-  eyeOffsetContainer.style.gap = '4px';
+  const eyeOffsetRow = tuneRow(createControlRow(t('eyeOffset', lang), labelWidth));
+  const eyeOffsetContainer = createThreeColGrid();
 
   const exInput = document.createElement('input');
   exInput.type = 'number';
   exInput.placeholder = 'X';
   exInput.value = label.eyeOffset ? label.eyeOffset[0] : 0;
-  exInput.style.flex = '1';
-  exInput.style.maxWidth = '60px';
+  tuneGridInput(exInput);
   styleInput(exInput);
 
   const eyInput = document.createElement('input');
   eyInput.type = 'number';
   eyInput.placeholder = 'Y';
   eyInput.value = label.eyeOffset ? label.eyeOffset[1] : 0;
-  eyInput.style.flex = '1';
-  eyInput.style.maxWidth = '60px';
+  tuneGridInput(eyInput);
   styleInput(eyInput);
 
   const ezInput = document.createElement('input');
   ezInput.type = 'number';
   ezInput.placeholder = 'Z';
   ezInput.value = label.eyeOffset ? label.eyeOffset[2] : 0;
-  ezInput.style.flex = '1';
-  ezInput.style.maxWidth = '60px';
+  tuneGridInput(ezInput);
   styleInput(ezInput);
 
   const updateEyeOffset = () => {
@@ -406,25 +529,23 @@ export function renderLabelDebugger(container, label, lang = 'zh') {
   container.appendChild(eyeOffsetRow);
 
   // Distance Display
-  const distanceRow = createControlRow(t('distanceDisplay', lang));
+  const distanceRow = tuneRow(createControlRow(t('distanceDisplay', lang), labelWidth));
   const distanceContainer = document.createElement('div');
-  distanceContainer.style.display = 'flex';
-  distanceContainer.style.gap = '4px';
+  tuneControl(distanceContainer);
+  distanceContainer.style.gap = '6px';
 
   const nearInput = document.createElement('input');
   nearInput.type = 'number';
   nearInput.placeholder = t('near', lang);
   nearInput.value = label.distanceDisplayCondition ? label.distanceDisplayCondition.near : 0;
-  nearInput.style.flex = '1';
-  nearInput.style.minWidth = '0';
+  tuneNumberInput(nearInput, '110px');
   styleInput(nearInput);
 
   const farInput = document.createElement('input');
   farInput.type = 'number';
   farInput.placeholder = t('far', lang);
   farInput.value = label.distanceDisplayCondition ? label.distanceDisplayCondition.far : '';
-  farInput.style.flex = '1';
-  farInput.style.minWidth = '0';
+  tuneNumberInput(farInput, '110px');
   styleInput(farInput);
 
   const updateDistance = () => {
@@ -441,41 +562,34 @@ export function renderLabelDebugger(container, label, lang = 'zh') {
   container.appendChild(distanceRow);
 
   // Scale By Distance
-  const scaleDistRow = createControlRow(t('scaleByDistance', lang));
-  const scaleDistContainer = document.createElement('div');
-  scaleDistContainer.style.display = 'grid';
-  scaleDistContainer.style.gridTemplateColumns = '1fr 1fr';
-  scaleDistContainer.style.width = '100%';
-
-
+  const scaleDistRow = tuneRow(createControlRow(t('scaleByDistance', lang), labelWidth));
+  const scaleDistContainer = createTwoColGrid();
   const snInput = document.createElement('input');
   snInput.type = 'number';
   snInput.placeholder = t('near', lang);
   snInput.value = label.scaleByDistance ? label.scaleByDistance.near : '';
-  // snInput.style.flex = '1';
-  snInput.style.maxWidth = '100%';
+  tuneGridInput(snInput);
   styleInput(snInput);
 
   const snvInput = document.createElement('input');
   snvInput.type = 'number';
   snvInput.placeholder = t('nearValue', lang);
   snvInput.value = label.scaleByDistance ? label.scaleByDistance.nearValue : '';
-  // snvInput.style.flex = '1';
-  snvInput.style.maxWidth = '95%';
+  tuneGridInput(snvInput);
   styleInput(snvInput);
 
   const sfInput = document.createElement('input');
   sfInput.type = 'number';
   sfInput.placeholder = t('far', lang);
   sfInput.value = label.scaleByDistance ? label.scaleByDistance.far : '';
-  sfInput.style.flex = '1';
-  sfInput.style.maxWidth = '60px';
+  tuneGridInput(sfInput);
   styleInput(sfInput);
 
   const sfvInput = document.createElement('input');
   sfvInput.type = 'number';
   sfvInput.placeholder = t('farValue', lang);
   sfvInput.value = label.scaleByDistance ? label.scaleByDistance.farValue : '';
+  tuneGridInput(sfvInput);
   styleInput(sfvInput);
 
   const updateScaleByDist = () => {
@@ -500,34 +614,35 @@ export function renderLabelDebugger(container, label, lang = 'zh') {
   container.appendChild(scaleDistRow);
 
   // Translucency By Distance
-  const transDistRow = createControlRow(t('translucencyByDistance', lang));
-  const transDistContainer = document.createElement('div');
-  transDistContainer.style.display = 'grid';
-  transDistContainer.style.gridTemplateColumns = '1fr 1fr';
-  transDistContainer.style.gap = '4px';
+  const transDistRow = tuneRow(createControlRow(t('translucencyByDistance', lang), labelWidth));
+  const transDistContainer = createTwoColGrid();
 
   const tnInput = document.createElement('input');
   tnInput.type = 'number';
   tnInput.placeholder = t('near', lang);
   tnInput.value = label.translucencyByDistance ? label.translucencyByDistance.near : '';
+  tuneGridInput(tnInput);
   styleInput(tnInput);
 
   const tnvInput = document.createElement('input');
   tnvInput.type = 'number';
   tnvInput.placeholder = t('nearValue', lang);
   tnvInput.value = label.translucencyByDistance ? label.translucencyByDistance.nearValue : '';
+  tuneGridInput(tnvInput);
   styleInput(tnvInput);
 
   const tfInput = document.createElement('input');
   tfInput.type = 'number';
   tfInput.placeholder = t('far', lang);
   tfInput.value = label.translucencyByDistance ? label.translucencyByDistance.far : '';
+  tuneGridInput(tfInput);
   styleInput(tfInput);
 
   const tfvInput = document.createElement('input');
   tfvInput.type = 'number';
   tfvInput.placeholder = t('farValue', lang);
   tfvInput.value = label.translucencyByDistance ? label.translucencyByDistance.farValue : '';
+  tuneGridInput(tfvInput);
   styleInput(tfvInput);
 
   const updateTransByDist = () => {
@@ -552,42 +667,35 @@ export function renderLabelDebugger(container, label, lang = 'zh') {
   container.appendChild(transDistRow);
 
   // Pixel Offset Scale By Distance
-  const posDistRow = createControlRow(t('pixelOffsetScaleByDistance', lang));
-  const posDistContainer = document.createElement('div');
-  posDistContainer.style.display = 'grid';
-  posDistContainer.style.gridTemplateColumns = '1fr 1fr';
-  posDistContainer.style.gap = '4px';
+  const posDistRow = tuneRow(createControlRow(t('pixelOffsetScaleByDistance', lang), labelWidth));
+  const posDistContainer = createTwoColGrid();
 
   const posnInput = document.createElement('input');
   posnInput.type = 'number';
   posnInput.placeholder = t('near', lang);
   posnInput.value = label.pixelOffsetScaleByDistance ? label.pixelOffsetScaleByDistance.near : '';
-  posnInput.style.flex = '1';
-  posnInput.style.minWidth = '0';
+  tuneGridInput(posnInput);
   styleInput(posnInput);
 
   const posnvInput = document.createElement('input');
   posnvInput.type = 'number';
   posnvInput.placeholder = t('nearValue', lang);
   posnvInput.value = label.pixelOffsetScaleByDistance ? label.pixelOffsetScaleByDistance.nearValue : '';
-  posnvInput.style.flex = '1';
-  posnvInput.style.minWidth = '0';
+  tuneGridInput(posnvInput);
   styleInput(posnvInput);
 
   const posfInput = document.createElement('input');
   posfInput.type = 'number';
   posfInput.placeholder = t('far', lang);
   posfInput.value = label.pixelOffsetScaleByDistance ? label.pixelOffsetScaleByDistance.far : '';
-  posfInput.style.flex = '1';
-  posfInput.style.minWidth = '0';
+  tuneGridInput(posfInput);
   styleInput(posfInput);
 
   const posfvInput = document.createElement('input');
   posfvInput.type = 'number';
   posfvInput.placeholder = t('farValue', lang);
   posfvInput.value = label.pixelOffsetScaleByDistance ? label.pixelOffsetScaleByDistance.farValue : '';
-  posfvInput.style.flex = '1';
-  posfvInput.style.minWidth = '0';
+  tuneGridInput(posfvInput);
   styleInput(posfvInput);
 
   const updatePosDist = () => {
@@ -612,11 +720,10 @@ export function renderLabelDebugger(container, label, lang = 'zh') {
   container.appendChild(posDistRow);
 
   // Disable Depth Test Distance
-  const depthTestRow = createControlRow(t('depthTest', lang));
+  const depthTestRow = tuneRow(createControlRow(t('depthTest', lang), labelWidth));
   const depthTestContainer = document.createElement('div');
-  depthTestContainer.style.display = 'flex';
-  depthTestContainer.style.gap = '8px';
-  depthTestContainer.style.alignItems = 'center';
+  tuneControl(depthTestContainer);
+  depthTestContainer.style.justifyContent = 'flex-end';
 
   const depthTestCheck = document.createElement('input');
   depthTestCheck.type = 'checkbox';
@@ -629,13 +736,46 @@ export function renderLabelDebugger(container, label, lang = 'zh') {
   depthTestLabel.style.color = '#ccc';
 
   depthTestCheck.addEventListener('change', (e) => {
-    label.setDisableDepthTestDistance(e.target.checked);
+    label.setDisableDepthTestDistance(e.target.checked ? Number.POSITIVE_INFINITY : undefined);
   });
 
   depthTestContainer.appendChild(depthTestCheck);
   depthTestContainer.appendChild(depthTestLabel);
   depthTestRow.appendChild(depthTestContainer);
   container.appendChild(depthTestRow);
+
+  // Display Height
+  const displayHeightRow = tuneRow(createControlRow(t('displayHeight', lang), labelWidth));
+  const displayHeightContainer = document.createElement('div');
+  tuneControl(displayHeightContainer);
+  displayHeightContainer.style.gap = '6px';
+
+  const minHeightInput = document.createElement('input');
+  minHeightInput.type = 'number';
+  minHeightInput.placeholder = t('min', lang);
+  minHeightInput.value = label.minDisplayHeight || 0;
+  tuneNumberInput(minHeightInput, '110px');
+  styleInput(minHeightInput);
+
+  const maxHeightInput = document.createElement('input');
+  maxHeightInput.type = 'number';
+  maxHeightInput.placeholder = t('max', lang);
+  maxHeightInput.value = Number.isFinite(label.maxDisplayHeight) ? label.maxDisplayHeight : '';
+  tuneNumberInput(maxHeightInput, '110px');
+  styleInput(maxHeightInput);
+
+  const updateDisplayHeight = () => {
+    const minVal = parseFloat(minHeightInput.value);
+    const maxVal = parseFloat(maxHeightInput.value);
+    label.setDisplayCondition(isNaN(minVal) ? 0 : minVal, isNaN(maxVal) ? 0 : maxVal);
+  };
+  minHeightInput.addEventListener('input', updateDisplayHeight);
+  maxHeightInput.addEventListener('input', updateDisplayHeight);
+
+  displayHeightContainer.appendChild(minHeightInput);
+  displayHeightContainer.appendChild(maxHeightInput);
+  displayHeightRow.appendChild(displayHeightContainer);
+  container.appendChild(displayHeightRow);
 
   // Copy Config Buttons
   const btnRow = document.createElement('div');
@@ -646,6 +786,8 @@ export function renderLabelDebugger(container, label, lang = 'zh') {
   const copyNativeBtn = createButton(t('copyNative', lang), () => {
     const isRelative = label.heightReference === 'relativeToGround';
     const h = isRelative ? (label.heightOffset || 0) : (label.position[2] || 0) + (label.heightOffset || 0);
+    const fill = label.color || label.fillColor || '#FFFFFF';
+    const bg = label.backgroundColor || null;
 
     let nativeCode = `viewer.entities.add({\\n` +
       `  position: Cesium.Cartesian3.fromDegrees(${label.position[0]}, ${label.position[1]}, ${h}),\\n` +
@@ -654,11 +796,11 @@ export function renderLabelDebugger(container, label, lang = 'zh') {
       `    font: '${label.font}',\\n` +
       `    scale: ${label.scale || 1.0},\\n` +
       `    style: Cesium.LabelStyle.${label.style},\\n` +
-      `    fillColor: Cesium.Color.fromCssColorString('${label.fillColor}'),\\n` +
-      `    outlineColor: Cesium.Color.fromCssColorString('${label.outlineColor}'),\\n` +
-      `    outlineWidth: ${label.outlineWidth},\\n` +
+      `    fillColor: Cesium.Color.fromCssColorString('${fill}'),\\n` +
+      `    outlineColor: Cesium.Color.fromCssColorString('${label.outlineColor || '#000000'}'),\\n` +
+      `    outlineWidth: ${label.outlineWidth || 2},\\n` +
       `    showBackground: ${label.showBackground},\\n` +
-      `    backgroundColor: Cesium.Color.fromCssColorString('${label.backgroundColor}'),\\n`;
+      `    backgroundColor: ${bg ? `Cesium.Color.fromCssColorString('${bg}')` : 'undefined'},\\n`;
 
     if (label.heightReference === 'clampToGround') {
         nativeCode += `    heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,\\n`;
@@ -684,6 +826,13 @@ export function renderLabelDebugger(container, label, lang = 'zh') {
 
     if (label.disableDepthTestDistance === Number.POSITIVE_INFINITY) {
         nativeCode += `    disableDepthTestDistance: Number.POSITIVE_INFINITY,\\n`;
+    }
+
+    if (label.minDisplayHeight && label.minDisplayHeight !== 0) {
+        nativeCode += `    minDisplayHeight: ${label.minDisplayHeight},\\n`;
+    }
+    if (Number.isFinite(label.maxDisplayHeight) && label.maxDisplayHeight !== Infinity) {
+        nativeCode += `    maxDisplayHeight: ${label.maxDisplayHeight},\\n`;
     }
 
     if (label.distanceDisplayCondition) {
@@ -717,10 +866,11 @@ export function renderLabelDebugger(container, label, lang = 'zh') {
   });
 
   const copyChainBtn = createButton(t('copyChain', lang), () => {
+    const fill = label.color || label.fillColor || '#FFFFFF';
     let chain = `entity.label({\\n` +
       `  text: '${label.text}',\\n` +
       `  font: '${label.font}',\\n` +
-      `  fillColor: '${label.fillColor}',\\n` +
+      `  color: '${fill}',\\n` +
       `  scale: ${label.scale || 1.0},\\n` +
       `  style: '${label.style}',\\n` +
       `  outlineColor: '${label.outlineColor}',\\n` +
@@ -765,6 +915,13 @@ export function renderLabelDebugger(container, label, lang = 'zh') {
     }
     if (label.disableDepthTestDistance === Number.POSITIVE_INFINITY) {
         chain += `,\\n  disableDepthTestDistance: true`;
+    }
+
+    if (label.minDisplayHeight && label.minDisplayHeight !== 0) {
+        chain += `,\\n  minDisplayHeight: ${label.minDisplayHeight}`;
+    }
+    if (Number.isFinite(label.maxDisplayHeight) && label.maxDisplayHeight !== Infinity) {
+        chain += `,\\n  maxDisplayHeight: ${label.maxDisplayHeight}`;
     }
 
     chain += `\\n})`;

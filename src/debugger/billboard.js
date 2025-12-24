@@ -3,6 +3,81 @@ import { createControlRow, colorToHex, createButton, styleInput, t } from './uti
 export function renderBillboardDebugger(container, billboard, lang = 'zh') {
   const pos = billboard.position || [0, 0, 0];
   const groupName = billboard.group || t('defaultGroup', lang);
+  const labelWidth = lang === 'zh' ? '88px' : '120px';
+  const inputWidth = '140px';
+  const twoColWidth = '240px';
+
+  const tuneRow = (row) => {
+    row.style.justifyContent = 'flex-start';
+    row.style.gap = '10px';
+    return row;
+  };
+
+  const tuneControl = (control) => {
+    control.style.display = 'flex';
+    control.style.gap = '8px';
+    control.style.alignItems = 'center';
+    control.style.flex = '1';
+    control.style.justifyContent = 'flex-end';
+    control.style.flexWrap = 'wrap';
+    control.style.minWidth = '0';
+    control.style.marginLeft = 'auto';
+    return control;
+  };
+
+  const tuneNumberInput = (input, width = inputWidth) => {
+    input.style.flex = `0 1 ${width}`;
+    input.style.width = width;
+    input.style.maxWidth = width;
+    input.style.minWidth = '0';
+    return input;
+  };
+
+  const tuneWideInput = (input, width = twoColWidth) => {
+    input.style.flex = `0 1 ${width}`;
+    input.style.width = width;
+    input.style.maxWidth = '100%';
+    input.style.minWidth = '0';
+    return input;
+  };
+
+  const tuneRangeInput = (input, width = twoColWidth) => {
+    input.style.flex = '0 1 auto';
+    input.style.width = width;
+    input.style.maxWidth = '100%';
+    input.style.minWidth = '0';
+    return input;
+  };
+
+  const tuneGridInput = (input) => {
+    input.style.width = '100%';
+    input.style.minWidth = '0';
+    return input;
+  };
+
+  const createTwoColGrid = () => {
+    const grid = document.createElement('div');
+    grid.style.display = 'grid';
+    grid.style.gridTemplateColumns = 'minmax(0, 110px) minmax(0, 110px)';
+    grid.style.gap = '6px';
+    grid.style.width = twoColWidth;
+    grid.style.maxWidth = '100%';
+    grid.style.justifyContent = 'end';
+    grid.style.marginLeft = 'auto';
+    return grid;
+  };
+
+  const createThreeColGrid = () => {
+    const grid = document.createElement('div');
+    grid.style.display = 'grid';
+    grid.style.gridTemplateColumns = 'minmax(0, 74px) minmax(0, 74px) minmax(0, 74px)';
+    grid.style.gap = '6px';
+    grid.style.width = twoColWidth;
+    grid.style.maxWidth = '100%';
+    grid.style.justifyContent = 'end';
+    grid.style.marginLeft = 'auto';
+    return grid;
+  };
 
   // Info Box
   const infoBox = document.createElement('div');
@@ -40,6 +115,7 @@ export function renderBillboardDebugger(container, billboard, lang = 'zh') {
 
   const groupBadge = document.createElement('div');
   groupBadge.textContent = groupName;
+  groupBadge.title = t('group', lang);
   groupBadge.style.cssText = `
     padding: 2px 8px;
     background: rgba(56, 189, 248, 0.15);
@@ -55,6 +131,7 @@ export function renderBillboardDebugger(container, billboard, lang = 'zh') {
   // ID Row
   const idRow = document.createElement('div');
   idRow.textContent = billboard.id;
+  idRow.title = billboard.id;
   idRow.style.cssText = `
     color: #94a3b8;
     font-size: 11px;
@@ -100,14 +177,37 @@ export function renderBillboardDebugger(container, billboard, lang = 'zh') {
   coordsGrid.appendChild(createCoordItem(t('alt', lang), alt.toFixed(2)));
   infoBox.appendChild(coordsGrid);
 
+  const helpBox = document.createElement('div');
+  helpBox.style.cssText = `
+    background: rgba(0,0,0,0.16);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 6px;
+    padding: 10px 10px;
+    color: #94a3b8;
+    font-size: 11px;
+    line-height: 1.5;
+  `;
+  helpBox.innerHTML = lang === 'zh'
+    ? `
+      <div style="color:#e2e8f0; font-weight:600; margin-bottom:6px;">功能说明</div>
+      <div><span style="color:#cbd5e1;">距离显示</span>：按相机到图标的距离控制显示（近/远）。</div>
+      <div><span style="color:#cbd5e1;">可见高度</span>：按相机高度范围控制显示（最小/最大）。</div>
+      <div style="margin-top:6px; opacity:0.9;">两者效果都可能表现为“看不见”，但触发条件不同，可叠加使用。</div>
+    `
+    : `
+      <div style="color:#e2e8f0; font-weight:600; margin-bottom:6px;">Notes</div>
+      <div><span style="color:#cbd5e1;">Dist Display</span>: show/hide by camera-to-icon distance (near/far).</div>
+      <div><span style="color:#cbd5e1;">Visible Ht</span>: show/hide by camera height range (min/max).</div>
+      <div style="margin-top:6px; opacity:0.9;">Both may “hide” the entity, but the conditions differ and can be combined.</div>
+    `;
+  infoBox.appendChild(helpBox);
+
   container.appendChild(infoBox);
 
   // Height Control (Altitude)
-  const heightRow = createControlRow(t('height', lang));
+  const heightRow = tuneRow(createControlRow(t('height', lang), labelWidth));
   const heightContainer = document.createElement('div');
-  heightContainer.style.display = 'flex';
-  heightContainer.style.gap = '8px';
-  heightContainer.style.alignItems = 'center';
+  tuneControl(heightContainer);
 
   const clampLabel = document.createElement('label');
   clampLabel.style.display = 'flex';
@@ -130,8 +230,7 @@ export function renderBillboardDebugger(container, billboard, lang = 'zh') {
   heightInput.step = '1';
   heightInput.value = billboard.heightOffset || 0;
   heightInput.placeholder = t('offset', lang);
-  heightInput.style.flex = '1';
-  heightInput.style.minWidth = '0';
+  tuneNumberInput(heightInput, '120px');
   styleInput(heightInput);
 
   clampCheck.addEventListener('change', (e) => {
@@ -152,26 +251,41 @@ export function renderBillboardDebugger(container, billboard, lang = 'zh') {
   heightRow.appendChild(heightContainer);
   container.appendChild(heightRow);
 
+  // Image
+  const imageRow = tuneRow(createControlRow(t('image', lang), labelWidth));
+  const imageContainer = document.createElement('div');
+  tuneControl(imageContainer);
+
+  const imageInput = document.createElement('input');
+  imageInput.type = 'text';
+  imageInput.placeholder = 'https://...';
+  imageInput.value = billboard.imageUrl || billboard.image || '';
+  tuneWideInput(imageInput);
+  styleInput(imageInput);
+  imageInput.addEventListener('change', (e) => {
+    billboard.setImage(e.target.value);
+  });
+
+  imageContainer.appendChild(imageInput);
+  imageRow.appendChild(imageContainer);
+  container.appendChild(imageRow);
+
   // Dimensions (Width/Height)
-  const dimRow = createControlRow(`${t('width', lang)} / ${t('height', lang)}`);
-  const dimContainer = document.createElement('div');
-  dimContainer.style.display = 'flex';
-  dimContainer.style.gap = '4px';
+  const dimRow = tuneRow(createControlRow(`${t('width', lang)} / ${t('height', lang)}`, labelWidth));
+  const dimContainer = createTwoColGrid();
 
   const wInput = document.createElement('input');
   wInput.type = 'number';
   wInput.placeholder = 'W';
   wInput.value = billboard.width || '';
-  wInput.style.flex = '1';
-  wInput.style.minWidth = '0';
+  tuneGridInput(wInput);
   styleInput(wInput);
 
   const hInput = document.createElement('input');
   hInput.type = 'number';
   hInput.placeholder = 'H';
   hInput.value = billboard.height || '';
-  hInput.style.flex = '1';
-  hInput.style.minWidth = '0';
+  tuneGridInput(hInput);
   styleInput(hInput);
 
   wInput.addEventListener('input', (e) => {
@@ -190,10 +304,12 @@ export function renderBillboardDebugger(container, billboard, lang = 'zh') {
   container.appendChild(dimRow);
 
   // Size In Meters
-  const metersRow = createControlRow(t('sizeInMeters', lang));
+  const metersRow = tuneRow(createControlRow(t('sizeInMeters', lang), labelWidth));
   const metersCheck = document.createElement('input');
   metersCheck.type = 'checkbox';
   metersCheck.checked = !!billboard.sizeInMeters;
+  metersCheck.style.marginLeft = 'auto';
+  metersCheck.style.cursor = 'pointer';
   metersCheck.addEventListener('change', (e) => {
       billboard.setSizeInMeters(e.target.checked);
   });
@@ -201,13 +317,14 @@ export function renderBillboardDebugger(container, billboard, lang = 'zh') {
   container.appendChild(metersRow);
 
   // Scale
-  const scaleRow = createControlRow(t('scale', lang));
+  const scaleRow = tuneRow(createControlRow(t('scale', lang), labelWidth));
   const scaleInput = document.createElement('input');
   scaleInput.type = 'number';
   scaleInput.step = '0.1';
   scaleInput.min = '0.1';
   scaleInput.value = billboard.scale || 1.0;
-  scaleInput.style.width = '60px';
+  tuneNumberInput(scaleInput, '120px');
+  scaleInput.style.marginLeft = 'auto';
   styleInput(scaleInput);
   scaleInput.addEventListener('input', (e) => {
     const val = parseFloat(e.target.value);
@@ -219,12 +336,13 @@ export function renderBillboardDebugger(container, billboard, lang = 'zh') {
   container.appendChild(scaleRow);
 
   // Rotation
-  const rotationRow = createControlRow(t('rotation', lang));
+  const rotationRow = tuneRow(createControlRow(t('rotation', lang), labelWidth));
   const rotationInput = document.createElement('input');
   rotationInput.type = 'number';
   rotationInput.step = '1';
   rotationInput.value = billboard.rotation || 0;
-  rotationInput.style.width = '60px';
+  tuneNumberInput(rotationInput, '120px');
+  rotationInput.style.marginLeft = 'auto';
   styleInput(rotationInput);
   rotationInput.addEventListener('input', (e) => {
     const val = parseFloat(e.target.value);
@@ -236,10 +354,8 @@ export function renderBillboardDebugger(container, billboard, lang = 'zh') {
   container.appendChild(rotationRow);
 
   // Origins
-  const originRow = createControlRow(`${t('horizontalOrigin', lang)} / ${t('verticalOrigin', lang)}`);
-  const originContainer = document.createElement('div');
-  originContainer.style.display = 'flex';
-  originContainer.style.gap = '4px';
+  const originRow = tuneRow(createControlRow(`${t('horizontalOrigin', lang)} / ${t('verticalOrigin', lang)}`, labelWidth));
+  const originContainer = createTwoColGrid();
 
   const hOriginSel = document.createElement('select');
   ['CENTER', 'LEFT', 'RIGHT'].forEach(o => {
@@ -249,8 +365,7 @@ export function renderBillboardDebugger(container, billboard, lang = 'zh') {
       if (billboard.horizontalOrigin === o) opt.selected = true;
       hOriginSel.appendChild(opt);
   });
-  hOriginSel.style.flex = '1';
-  hOriginSel.style.minWidth = '0';
+  tuneGridInput(hOriginSel);
   styleInput(hOriginSel);
   hOriginSel.addEventListener('change', (e) => billboard.setHorizontalOrigin(e.target.value));
 
@@ -262,8 +377,7 @@ export function renderBillboardDebugger(container, billboard, lang = 'zh') {
       if (billboard.verticalOrigin === o) opt.selected = true;
       vOriginSel.appendChild(opt);
   });
-  vOriginSel.style.flex = '1';
-  vOriginSel.style.minWidth = '0';
+  tuneGridInput(vOriginSel);
   styleInput(vOriginSel);
   vOriginSel.addEventListener('change', (e) => billboard.setVerticalOrigin(e.target.value));
 
@@ -273,11 +387,12 @@ export function renderBillboardDebugger(container, billboard, lang = 'zh') {
   container.appendChild(originRow);
 
   // Color
-  const colorRow = createControlRow(t('color', lang));
+  const colorRow = tuneRow(createControlRow(t('color', lang), labelWidth));
   const colorInput = document.createElement('input');
   colorInput.type = 'color';
   colorInput.value = colorToHex(billboard.color);
   colorInput.style.cursor = 'pointer';
+  colorInput.style.marginLeft = 'auto';
   colorInput.style.width = '40px';
   colorInput.style.height = '24px';
   colorInput.style.border = 'none';
@@ -289,26 +404,114 @@ export function renderBillboardDebugger(container, billboard, lang = 'zh') {
   colorRow.appendChild(colorInput);
   container.appendChild(colorRow);
 
+  // Opacity
+  const opacityRow = tuneRow(createControlRow(t('opacity', lang), labelWidth));
+  const opacityInput = document.createElement('input');
+  opacityInput.type = 'range';
+  opacityInput.min = '0';
+  opacityInput.max = '1';
+  opacityInput.step = '0.1';
+  opacityInput.value = billboard.opacity != null ? billboard.opacity : 1;
+  tuneRangeInput(opacityInput);
+  opacityInput.style.marginLeft = 'auto';
+  opacityInput.style.cursor = 'pointer';
+  opacityInput.addEventListener('input', (e) => {
+    const val = parseFloat(e.target.value);
+    billboard.setOpacity(val);
+  });
+  opacityRow.appendChild(opacityInput);
+  container.appendChild(opacityRow);
+
+  // Pixel Offset
+  const pixelOffsetRow = tuneRow(createControlRow(t('pixelOffset', lang), labelWidth));
+  const pixelOffsetContainer = createTwoColGrid();
+
+  const pxInput = document.createElement('input');
+  pxInput.type = 'number';
+  pxInput.placeholder = 'X';
+  pxInput.value = billboard.pixelOffset ? billboard.pixelOffset[0] : 0;
+  tuneGridInput(pxInput);
+  styleInput(pxInput);
+
+  const pyInput = document.createElement('input');
+  pyInput.type = 'number';
+  pyInput.placeholder = 'Y';
+  pyInput.value = billboard.pixelOffset ? billboard.pixelOffset[1] : 0;
+  tuneGridInput(pyInput);
+  styleInput(pyInput);
+
+  const updatePixelOffset = () => {
+    const x = parseFloat(pxInput.value) || 0;
+    const y = parseFloat(pyInput.value) || 0;
+    billboard.setPixelOffset(x, y);
+  };
+  pxInput.addEventListener('input', updatePixelOffset);
+  pyInput.addEventListener('input', updatePixelOffset);
+
+  pixelOffsetContainer.appendChild(pxInput);
+  pixelOffsetContainer.appendChild(pyInput);
+  pixelOffsetRow.appendChild(pixelOffsetContainer);
+  container.appendChild(pixelOffsetRow);
+
+  // Eye Offset
+  const eyeOffsetRow = tuneRow(createControlRow(t('eyeOffset', lang), labelWidth));
+  const eyeOffsetContainer = createThreeColGrid();
+
+  const exInput = document.createElement('input');
+  exInput.type = 'number';
+  exInput.placeholder = 'X';
+  exInput.value = billboard.eyeOffset ? billboard.eyeOffset[0] : 0;
+  tuneGridInput(exInput);
+  styleInput(exInput);
+
+  const eyInput = document.createElement('input');
+  eyInput.type = 'number';
+  eyInput.placeholder = 'Y';
+  eyInput.value = billboard.eyeOffset ? billboard.eyeOffset[1] : 0;
+  tuneGridInput(eyInput);
+  styleInput(eyInput);
+
+  const ezInput = document.createElement('input');
+  ezInput.type = 'number';
+  ezInput.placeholder = 'Z';
+  ezInput.value = billboard.eyeOffset ? billboard.eyeOffset[2] : 0;
+  tuneGridInput(ezInput);
+  styleInput(ezInput);
+
+  const updateEyeOffset = () => {
+    const x = parseFloat(exInput.value) || 0;
+    const y = parseFloat(eyInput.value) || 0;
+    const z = parseFloat(ezInput.value) || 0;
+    billboard.setEyeOffset(x, y, z);
+  };
+  exInput.addEventListener('input', updateEyeOffset);
+  eyInput.addEventListener('input', updateEyeOffset);
+  ezInput.addEventListener('input', updateEyeOffset);
+
+  eyeOffsetContainer.appendChild(exInput);
+  eyeOffsetContainer.appendChild(eyInput);
+  eyeOffsetContainer.appendChild(ezInput);
+  eyeOffsetRow.appendChild(eyeOffsetContainer);
+  container.appendChild(eyeOffsetRow);
+
   // Distance Display
-  const distanceRow = createControlRow(t('distanceDisplay', lang));
+  const distanceRow = tuneRow(createControlRow(t('distanceDisplay', lang), labelWidth));
   const distanceContainer = document.createElement('div');
-  distanceContainer.style.display = 'flex';
-  distanceContainer.style.gap = '4px';
+  tuneControl(distanceContainer);
+  distanceContainer.style.gap = '6px';
 
   const nearInput = document.createElement('input');
   nearInput.type = 'number';
   nearInput.placeholder = t('near', lang);
   nearInput.value = billboard.distanceDisplayCondition ? billboard.distanceDisplayCondition.near : 0;
-  nearInput.style.flex = '1';
-  nearInput.style.minWidth = '0';
+  tuneNumberInput(nearInput, '110px');
   styleInput(nearInput);
 
   const farInput = document.createElement('input');
   farInput.type = 'number';
   farInput.placeholder = t('far', lang);
   farInput.value = billboard.distanceDisplayCondition ? billboard.distanceDisplayCondition.far : '';
-  farInput.style.flex = '1';
-  farInput.style.minWidth = '0';
+  tuneNumberInput(farInput, '110px');
   styleInput(farInput);
 
   const updateDistance = () => {
@@ -325,42 +528,35 @@ export function renderBillboardDebugger(container, billboard, lang = 'zh') {
   container.appendChild(distanceRow);
 
   // Scale By Distance
-  const scaleDistRow = createControlRow(t('scaleByDistance', lang));
-  const scaleDistContainer = document.createElement('div');
-  scaleDistContainer.style.display = 'grid';
-  scaleDistContainer.style.gridTemplateColumns = '1fr 1fr';
-  scaleDistContainer.style.gap = '4px';
+  const scaleDistRow = tuneRow(createControlRow(t('scaleByDistance', lang), labelWidth));
+  const scaleDistContainer = createTwoColGrid();
 
   const snInput = document.createElement('input');
   snInput.type = 'number';
   snInput.placeholder = t('near', lang);
   snInput.value = billboard.scaleByDistance ? billboard.scaleByDistance.near : '';
-  snInput.style.flex = '1';
-  snInput.style.minWidth = '0';
+  tuneGridInput(snInput);
   styleInput(snInput);
 
   const snvInput = document.createElement('input');
   snvInput.type = 'number';
   snvInput.placeholder = t('nearValue', lang);
   snvInput.value = billboard.scaleByDistance ? billboard.scaleByDistance.nearValue : '';
-  snvInput.style.flex = '1';
-  snvInput.style.minWidth = '0';
+  tuneGridInput(snvInput);
   styleInput(snvInput);
 
   const sfInput = document.createElement('input');
   sfInput.type = 'number';
   sfInput.placeholder = t('far', lang);
   sfInput.value = billboard.scaleByDistance ? billboard.scaleByDistance.far : '';
-  sfInput.style.flex = '1';
-  sfInput.style.minWidth = '0';
+  tuneGridInput(sfInput);
   styleInput(sfInput);
 
   const sfvInput = document.createElement('input');
   sfvInput.type = 'number';
   sfvInput.placeholder = t('farValue', lang);
   sfvInput.value = billboard.scaleByDistance ? billboard.scaleByDistance.farValue : '';
-  sfvInput.style.flex = '1';
-  sfvInput.style.minWidth = '0';
+  tuneGridInput(sfvInput);
   styleInput(sfvInput);
 
   const updateScaleByDist = () => {
@@ -385,42 +581,35 @@ export function renderBillboardDebugger(container, billboard, lang = 'zh') {
   container.appendChild(scaleDistRow);
 
   // Translucency By Distance
-  const transDistRow = createControlRow(t('translucencyByDistance', lang));
-  const transDistContainer = document.createElement('div');
-  transDistContainer.style.display = 'grid';
-  transDistContainer.style.gridTemplateColumns = '1fr 1fr';
-  transDistContainer.style.gap = '4px';
+  const transDistRow = tuneRow(createControlRow(t('translucencyByDistance', lang), labelWidth));
+  const transDistContainer = createTwoColGrid();
 
   const tnInput = document.createElement('input');
   tnInput.type = 'number';
   tnInput.placeholder = t('near', lang);
   tnInput.value = billboard.translucencyByDistance ? billboard.translucencyByDistance.near : '';
-  tnInput.style.flex = '1';
-  tnInput.style.minWidth = '0';
+  tuneGridInput(tnInput);
   styleInput(tnInput);
 
   const tnvInput = document.createElement('input');
   tnvInput.type = 'number';
   tnvInput.placeholder = t('nearValue', lang);
   tnvInput.value = billboard.translucencyByDistance ? billboard.translucencyByDistance.nearValue : '';
-  tnvInput.style.flex = '1';
-  tnvInput.style.minWidth = '0';
+  tuneGridInput(tnvInput);
   styleInput(tnvInput);
 
   const tfInput = document.createElement('input');
   tfInput.type = 'number';
   tfInput.placeholder = t('far', lang);
   tfInput.value = billboard.translucencyByDistance ? billboard.translucencyByDistance.far : '';
-  tfInput.style.flex = '1';
-  tfInput.style.minWidth = '0';
+  tuneGridInput(tfInput);
   styleInput(tfInput);
 
   const tfvInput = document.createElement('input');
   tfvInput.type = 'number';
   tfvInput.placeholder = t('farValue', lang);
   tfvInput.value = billboard.translucencyByDistance ? billboard.translucencyByDistance.farValue : '';
-  tfvInput.style.flex = '1';
-  tfvInput.style.minWidth = '0';
+  tuneGridInput(tfvInput);
   styleInput(tfvInput);
 
   const updateTransByDist = () => {
@@ -445,42 +634,35 @@ export function renderBillboardDebugger(container, billboard, lang = 'zh') {
   container.appendChild(transDistRow);
 
   // Pixel Offset Scale By Distance
-  const posDistRow = createControlRow(t('pixelOffsetScaleByDistance', lang));
-  const posDistContainer = document.createElement('div');
-  posDistContainer.style.display = 'grid';
-  posDistContainer.style.gridTemplateColumns = '1fr 1fr';
-  posDistContainer.style.gap = '4px';
+  const posDistRow = tuneRow(createControlRow(t('pixelOffsetScaleByDistance', lang), labelWidth));
+  const posDistContainer = createTwoColGrid();
 
   const posnInput = document.createElement('input');
   posnInput.type = 'number';
   posnInput.placeholder = t('near', lang);
   posnInput.value = billboard.pixelOffsetScaleByDistance ? billboard.pixelOffsetScaleByDistance.near : '';
-  posnInput.style.flex = '1';
-  posnInput.style.minWidth = '0';
+  tuneGridInput(posnInput);
   styleInput(posnInput);
 
   const posnvInput = document.createElement('input');
   posnvInput.type = 'number';
   posnvInput.placeholder = t('nearValue', lang);
   posnvInput.value = billboard.pixelOffsetScaleByDistance ? billboard.pixelOffsetScaleByDistance.nearValue : '';
-  posnvInput.style.flex = '1';
-  posnvInput.style.minWidth = '0';
+  tuneGridInput(posnvInput);
   styleInput(posnvInput);
 
   const posfInput = document.createElement('input');
   posfInput.type = 'number';
   posfInput.placeholder = t('far', lang);
   posfInput.value = billboard.pixelOffsetScaleByDistance ? billboard.pixelOffsetScaleByDistance.far : '';
-  posfInput.style.flex = '1';
-  posfInput.style.minWidth = '0';
+  tuneGridInput(posfInput);
   styleInput(posfInput);
 
   const posfvInput = document.createElement('input');
   posfvInput.type = 'number';
   posfvInput.placeholder = t('farValue', lang);
   posfvInput.value = billboard.pixelOffsetScaleByDistance ? billboard.pixelOffsetScaleByDistance.farValue : '';
-  posfvInput.style.flex = '1';
-  posfvInput.style.minWidth = '0';
+  tuneGridInput(posfvInput);
   styleInput(posfvInput);
 
   const updatePosDist = () => {
@@ -505,11 +687,10 @@ export function renderBillboardDebugger(container, billboard, lang = 'zh') {
   container.appendChild(posDistRow);
 
   // Disable Depth Test Distance
-  const depthTestRow = createControlRow(t('depthTest', lang));
+  const depthTestRow = tuneRow(createControlRow(t('depthTest', lang), labelWidth));
   const depthTestContainer = document.createElement('div');
-  depthTestContainer.style.display = 'flex';
-  depthTestContainer.style.gap = '8px';
-  depthTestContainer.style.alignItems = 'center';
+  tuneControl(depthTestContainer);
+  depthTestContainer.style.justifyContent = 'flex-end';
 
   const depthTestCheck = document.createElement('input');
   depthTestCheck.type = 'checkbox';
@@ -530,6 +711,39 @@ export function renderBillboardDebugger(container, billboard, lang = 'zh') {
   depthTestRow.appendChild(depthTestContainer);
   container.appendChild(depthTestRow);
 
+  // Display Height
+  const displayHeightRow = tuneRow(createControlRow(t('displayHeight', lang), labelWidth));
+  const displayHeightContainer = document.createElement('div');
+  tuneControl(displayHeightContainer);
+  displayHeightContainer.style.gap = '6px';
+
+  const minHeightInput = document.createElement('input');
+  minHeightInput.type = 'number';
+  minHeightInput.placeholder = t('min', lang);
+  minHeightInput.value = billboard.minDisplayHeight || 0;
+  tuneNumberInput(minHeightInput, '110px');
+  styleInput(minHeightInput);
+
+  const maxHeightInput = document.createElement('input');
+  maxHeightInput.type = 'number';
+  maxHeightInput.placeholder = t('max', lang);
+  maxHeightInput.value = Number.isFinite(billboard.maxDisplayHeight) ? billboard.maxDisplayHeight : '';
+  tuneNumberInput(maxHeightInput, '110px');
+  styleInput(maxHeightInput);
+
+  const updateDisplayHeight = () => {
+    const minVal = parseFloat(minHeightInput.value);
+    const maxVal = parseFloat(maxHeightInput.value);
+    billboard.setDisplayCondition(isNaN(minVal) ? 0 : minVal, isNaN(maxVal) ? 0 : maxVal);
+  };
+  minHeightInput.addEventListener('input', updateDisplayHeight);
+  maxHeightInput.addEventListener('input', updateDisplayHeight);
+
+  displayHeightContainer.appendChild(minHeightInput);
+  displayHeightContainer.appendChild(maxHeightInput);
+  displayHeightRow.appendChild(displayHeightContainer);
+  container.appendChild(displayHeightRow);
+
   // Copy Config Buttons
   const btnRow = document.createElement('div');
   btnRow.style.display = 'flex';
@@ -545,7 +759,7 @@ export function renderBillboardDebugger(container, billboard, lang = 'zh') {
       `  billboard: {\\n` +
       `    image: '${billboard.imageUrl || billboard.image}',\\n` +
       `    scale: ${billboard.scale || 1.0},\\n` +
-      `    color: Cesium.Color.fromCssColorString('${billboard.color}'),\\n` +
+      `    color: Cesium.Color.fromCssColorString('${billboard.color}').withAlpha(${billboard.opacity != null ? billboard.opacity : 1}),\\n` +
       `    rotation: ${billboard.rotation || 0},\\n`;
 
     if (billboard.width) {
@@ -585,6 +799,13 @@ export function renderBillboardDebugger(container, billboard, lang = 'zh') {
         nativeCode += `    disableDepthTestDistance: Number.POSITIVE_INFINITY,\\n`;
     }
 
+    if (billboard.minDisplayHeight && billboard.minDisplayHeight !== 0) {
+        nativeCode += `    minDisplayHeight: ${billboard.minDisplayHeight},\\n`;
+    }
+    if (Number.isFinite(billboard.maxDisplayHeight) && billboard.maxDisplayHeight !== Infinity) {
+        nativeCode += `    maxDisplayHeight: ${billboard.maxDisplayHeight},\\n`;
+    }
+
     if (billboard.distanceDisplayCondition) {
         nativeCode += `    distanceDisplayCondition: new Cesium.DistanceDisplayCondition(${billboard.distanceDisplayCondition.near}, ${billboard.distanceDisplayCondition.far}),\\n`;
     }
@@ -620,6 +841,7 @@ export function renderBillboardDebugger(container, billboard, lang = 'zh') {
       `  image: '${billboard.imageUrl || billboard.image}',\\n` +
       `  scale: ${billboard.scale || 1.0},\\n` +
       `  color: '${billboard.color}',\\n` +
+      `  opacity: ${billboard.opacity != null ? billboard.opacity : 1},\\n` +
       `  rotation: ${billboard.rotation || 0}`;
 
     if (billboard.heightReference === 'clampToGround') {
@@ -667,6 +889,13 @@ export function renderBillboardDebugger(container, billboard, lang = 'zh') {
     }
     if (billboard.disableDepthTestDistance === Number.POSITIVE_INFINITY) {
         chain += `,\\n  disableDepthTestDistance: true`;
+    }
+
+    if (billboard.minDisplayHeight && billboard.minDisplayHeight !== 0) {
+        chain += `,\\n  minDisplayHeight: ${billboard.minDisplayHeight}`;
+    }
+    if (Number.isFinite(billboard.maxDisplayHeight) && billboard.maxDisplayHeight !== Infinity) {
+        chain += `,\\n  maxDisplayHeight: ${billboard.maxDisplayHeight}`;
     }
 
     chain += `\\n})`;
