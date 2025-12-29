@@ -40,6 +40,25 @@ export function renderPointDebugger(container, point, lang = 'zh') {
     input.style.minWidth = '0';
     return input;
   };
+  
+  // --- Section Helper ---
+  const createSection = (title) => {
+    const section = document.createElement('div');
+    section.style.marginBottom = '12px';
+    section.style.borderTop = '1px solid rgba(255,255,255,0.1)';
+    section.style.paddingTop = '8px';
+    
+    const header = document.createElement('div');
+    header.textContent = title;
+    header.style.fontSize = '12px';
+    header.style.fontWeight = '600';
+    header.style.color = '#94a3b8';
+    header.style.marginBottom = '8px';
+    header.style.paddingLeft = '4px';
+    
+    section.appendChild(header);
+    return section;
+  };
 
   // Info Box (ID, Type, Group, Coords)
   const infoBox = document.createElement('div');
@@ -168,6 +187,10 @@ export function renderPointDebugger(container, point, lang = 'zh') {
 
   container.appendChild(infoBox);
 
+  // --- Position & Geometry Section ---
+  const posSection = createSection(t('posAndGeo', lang));
+  container.appendChild(posSection);
+
   // Height Control (Clamp & Offset)
   const heightRow = tuneRow(createControlRow(t('height', lang), labelWidth));
   const heightContainer = document.createElement('div');
@@ -216,7 +239,15 @@ export function renderPointDebugger(container, point, lang = 'zh') {
 
   heightContainer.appendChild(heightInput);
   heightRow.appendChild(heightContainer);
-  container.appendChild(heightRow);
+  posSection.appendChild(heightRow);
+
+
+
+
+
+  // --- Style Section ---
+  const styleSection = createSection(t('style', lang));
+  container.appendChild(styleSection);
 
   // Color
   const colorRow = tuneRow(createControlRow(t('color', lang), labelWidth));
@@ -234,7 +265,7 @@ export function renderPointDebugger(container, point, lang = 'zh') {
     point.setColor(e.target.value);
   });
   colorRow.appendChild(colorInput);
-  container.appendChild(colorRow);
+  styleSection.appendChild(colorRow);
 
   // Pixel Size
   const sizeRow = tuneRow(createControlRow(`${t('pixelSize', lang)} (px)`, labelWidth));
@@ -253,7 +284,7 @@ export function renderPointDebugger(container, point, lang = 'zh') {
     }
   });
   sizeRow.appendChild(sizeInput);
-  container.appendChild(sizeRow);
+  styleSection.appendChild(sizeRow);
 
   // Opacity
   const opacityRow = tuneRow(createControlRow(t('opacity', lang), labelWidth));
@@ -271,44 +302,7 @@ export function renderPointDebugger(container, point, lang = 'zh') {
     point.setOpacity(val);
   });
   opacityRow.appendChild(opacityInput);
-  container.appendChild(opacityRow);
-
-  // Flash
-  const flashRow = tuneRow(createControlRow(t('flash', lang), labelWidth));
-  const flashContainer = document.createElement('div');
-  tuneControl(flashContainer);
-  flashContainer.style.gap = '6px';
-
-  const flashCheck = document.createElement('input');
-  flashCheck.type = 'checkbox';
-  flashCheck.checked = !!point._flashing;
-  flashCheck.style.cursor = 'pointer';
-
-  const flashDurationInput = document.createElement('input');
-  flashDurationInput.type = 'number';
-  flashDurationInput.min = '50';
-  flashDurationInput.step = '50';
-  flashDurationInput.placeholder = t('flashDuration', lang);
-  flashDurationInput.value = Number.isFinite(point._debugFlashDuration) ? point._debugFlashDuration : 1000;
-  tuneNumberInput(flashDurationInput, '120px');
-  styleInput(flashDurationInput);
-
-  const applyFlash = () => {
-    const duration = Math.max(50, parseInt(flashDurationInput.value || '1000', 10) || 1000);
-    point._debugFlashDuration = duration;
-    point.flash(!!flashCheck.checked, duration);
-  };
-
-  flashCheck.addEventListener('change', applyFlash);
-  flashDurationInput.addEventListener('input', () => {
-    if (!flashCheck.checked) return;
-    applyFlash();
-  });
-
-  flashContainer.appendChild(flashCheck);
-  flashContainer.appendChild(flashDurationInput);
-  flashRow.appendChild(flashContainer);
-  container.appendChild(flashRow);
+  styleSection.appendChild(opacityRow);
 
   // Outline Control
   const outlineRow = tuneRow(createControlRow(t('outline', lang), labelWidth));
@@ -354,7 +348,48 @@ export function renderPointDebugger(container, point, lang = 'zh') {
   outlineContainer.appendChild(outlineColorInput);
   outlineContainer.appendChild(outlineWidthInput);
   outlineRow.appendChild(outlineContainer);
-  container.appendChild(outlineRow);
+  styleSection.appendChild(outlineRow);
+
+  // Flash
+  const flashRow = tuneRow(createControlRow(t('flash', lang), labelWidth));
+  const flashContainer = document.createElement('div');
+  tuneControl(flashContainer);
+  flashContainer.style.gap = '6px';
+
+  const flashCheck = document.createElement('input');
+  flashCheck.type = 'checkbox';
+  flashCheck.checked = !!point._flashing;
+  flashCheck.style.cursor = 'pointer';
+
+  const flashDurationInput = document.createElement('input');
+  flashDurationInput.type = 'number';
+  flashDurationInput.min = '50';
+  flashDurationInput.step = '50';
+  flashDurationInput.placeholder = t('flashDuration', lang);
+  flashDurationInput.value = Number.isFinite(point._debugFlashDuration) ? point._debugFlashDuration : 1000;
+  tuneNumberInput(flashDurationInput, '120px');
+  styleInput(flashDurationInput);
+
+  const applyFlash = () => {
+    const duration = Math.max(50, parseInt(flashDurationInput.value || '1000', 10) || 1000);
+    point._debugFlashDuration = duration;
+    point.flash(!!flashCheck.checked, duration);
+  };
+
+  flashCheck.addEventListener('change', applyFlash);
+  flashDurationInput.addEventListener('input', () => {
+    if (!flashCheck.checked) return;
+    applyFlash();
+  });
+
+  flashContainer.appendChild(flashCheck);
+  flashContainer.appendChild(flashDurationInput);
+  flashRow.appendChild(flashContainer);
+  styleSection.appendChild(flashRow);
+
+  // --- Display Control Section ---
+  const displaySection = createSection(t('displayControl', lang));
+  container.appendChild(displaySection);
 
   // Distance Display
   const distanceRow = tuneRow(createControlRow(t('distanceDisplay', lang), labelWidth));
@@ -379,7 +414,7 @@ export function renderPointDebugger(container, point, lang = 'zh') {
   const updateDistance = () => {
     const n = parseFloat(nearInput.value) || 0;
     const f = parseFloat(farInput.value);
-    point.setDistanceDisplayCondition(n, isNaN(f) ? undefined : f);
+    point.setDistanceDisplayCondition({ near: n, far: isNaN(f) ? undefined : f });
   };
   nearInput.addEventListener('input', updateDistance);
   farInput.addEventListener('input', updateDistance);
@@ -387,7 +422,54 @@ export function renderPointDebugger(container, point, lang = 'zh') {
   distanceContainer.appendChild(nearInput);
   distanceContainer.appendChild(farInput);
   distanceRow.appendChild(distanceContainer);
-  container.appendChild(distanceRow);
+  displaySection.appendChild(distanceRow);
+
+  // Display Height
+  const displayHeightRow = tuneRow(createControlRow(t('displayHeight', lang), labelWidth));
+  const displayHeightContainer = document.createElement('div');
+  tuneControl(displayHeightContainer);
+  displayHeightContainer.style.gap = '6px';
+
+  const minHeightInput = document.createElement('input');
+  minHeightInput.type = 'number';
+  minHeightInput.placeholder = t('min', lang);
+  minHeightInput.value = point.minDisplayHeight || 0;
+  tuneNumberInput(minHeightInput, '110px');
+  styleInput(minHeightInput);
+
+  const maxHeightInput = document.createElement('input');
+  maxHeightInput.type = 'number';
+  maxHeightInput.placeholder = t('max', lang);
+  maxHeightInput.value = Number.isFinite(point.maxDisplayHeight) ? point.maxDisplayHeight : '';
+  tuneNumberInput(maxHeightInput, '110px');
+  styleInput(maxHeightInput);
+
+  const updateDisplayHeight = () => {
+    const minVal = parseFloat(minHeightInput.value);
+    const maxVal = parseFloat(maxHeightInput.value);
+    
+    // We can use point.setDisplayCondition for cleaner API usage if available
+    if (typeof point.setDisplayCondition === 'function') {
+      point.setDisplayCondition({
+          min: isNaN(minVal) ? 0 : minVal,
+          max: isNaN(maxVal) ? undefined : maxVal
+      });
+    } else {
+      // Fallback manual update
+      point.minDisplayHeight = isNaN(minVal) ? 0 : minVal;
+      point.maxDisplayHeight = isNaN(maxVal) ? Infinity : maxVal;
+      if (point._disableHeightCheck) point._disableHeightCheck();
+      if (point._enableHeightCheck) point._enableHeightCheck();
+    }
+  };
+
+  minHeightInput.addEventListener('input', updateDisplayHeight);
+  maxHeightInput.addEventListener('input', updateDisplayHeight);
+
+  displayHeightContainer.appendChild(minHeightInput);
+  displayHeightContainer.appendChild(maxHeightInput);
+  displayHeightRow.appendChild(displayHeightContainer);
+  displaySection.appendChild(displayHeightRow);
 
   // Scale By Distance
   const scaleDistRow = tuneRow(createControlRow(t('scaleByDistance', lang), labelWidth));
@@ -437,9 +519,13 @@ export function renderPointDebugger(container, point, lang = 'zh') {
     const nv = parseFloat(snvInput.value);
     const f = parseFloat(sfInput.value);
     const fv = parseFloat(sfvInput.value);
-    if (!isNaN(n) && !isNaN(nv) && !isNaN(f) && !isNaN(fv)) {
-        point.setScaleByDistance(n, nv, f, fv);
-    }
+    
+    point.setScaleByDistance({ 
+        near: isNaN(n) ? undefined : n, 
+        nearValue: isNaN(nv) ? undefined : nv, 
+        far: isNaN(f) ? undefined : f, 
+        farValue: isNaN(fv) ? undefined : fv 
+    });
   };
   snInput.addEventListener('input', updateScaleByDist);
   snvInput.addEventListener('input', updateScaleByDist);
@@ -451,7 +537,7 @@ export function renderPointDebugger(container, point, lang = 'zh') {
   scaleDistContainer.appendChild(sfInput);
   scaleDistContainer.appendChild(sfvInput);
   scaleDistRow.appendChild(scaleDistContainer);
-  container.appendChild(scaleDistRow);
+  displaySection.appendChild(scaleDistRow);
 
   // Translucency By Distance
   const transDistRow = tuneRow(createControlRow(t('translucencyByDistance', lang), labelWidth));
@@ -501,9 +587,13 @@ export function renderPointDebugger(container, point, lang = 'zh') {
     const nv = parseFloat(tnvInput.value);
     const f = parseFloat(tfInput.value);
     const fv = parseFloat(tfvInput.value);
-    if (!isNaN(n) && !isNaN(nv) && !isNaN(f) && !isNaN(fv)) {
-        point.setTranslucencyByDistance(n, nv, f, fv);
-    }
+
+    point.setTranslucencyByDistance({ 
+        near: isNaN(n) ? undefined : n, 
+        nearValue: isNaN(nv) ? undefined : nv, 
+        far: isNaN(f) ? undefined : f, 
+        farValue: isNaN(fv) ? undefined : fv 
+    });
   };
   tnInput.addEventListener('input', updateTransByDist);
   tnvInput.addEventListener('input', updateTransByDist);
@@ -515,7 +605,9 @@ export function renderPointDebugger(container, point, lang = 'zh') {
   transDistContainer.appendChild(tfInput);
   transDistContainer.appendChild(tfvInput);
   transDistRow.appendChild(transDistContainer);
-  container.appendChild(transDistRow);
+  displaySection.appendChild(transDistRow);
+
+
 
   // Disable Depth Test Distance
   const depthTestRow = tuneRow(createControlRow(t('depthTest', lang), labelWidth));
@@ -541,86 +633,111 @@ export function renderPointDebugger(container, point, lang = 'zh') {
   depthTestContainer.appendChild(depthTestCheck);
   depthTestContainer.appendChild(depthTestLabel);
   depthTestRow.appendChild(depthTestContainer);
-  container.appendChild(depthTestRow);
+  displaySection.appendChild(depthTestRow);
 
-  // Display Height
-  const displayHeightRow = tuneRow(createControlRow(t('displayHeight', lang), labelWidth));
-  const displayHeightContainer = document.createElement('div');
-  tuneControl(displayHeightContainer);
-  displayHeightContainer.style.gap = '6px';
-
-  const minHeightInput = document.createElement('input');
-  minHeightInput.type = 'number';
-  minHeightInput.placeholder = t('min', lang);
-  minHeightInput.value = point.minDisplayHeight || 0;
-  tuneNumberInput(minHeightInput, '110px');
-  styleInput(minHeightInput);
-
-  const maxHeightInput = document.createElement('input');
-  maxHeightInput.type = 'number';
-  maxHeightInput.placeholder = t('max', lang);
-  maxHeightInput.value = Number.isFinite(point.maxDisplayHeight) ? point.maxDisplayHeight : '';
-  tuneNumberInput(maxHeightInput, '110px');
-  styleInput(maxHeightInput);
-
-  const updateDisplayHeight = () => {
-    const minVal = parseFloat(minHeightInput.value);
-    const maxVal = parseFloat(maxHeightInput.value);
-    point.setDisplayCondition(isNaN(minVal) ? 0 : minVal, isNaN(maxVal) ? 0 : maxVal);
-  };
-
-  minHeightInput.addEventListener('input', updateDisplayHeight);
-  maxHeightInput.addEventListener('input', updateDisplayHeight);
-
-  displayHeightContainer.appendChild(minHeightInput);
-  displayHeightContainer.appendChild(maxHeightInput);
-  displayHeightRow.appendChild(displayHeightContainer);
-  container.appendChild(displayHeightRow);
-
-  // Copy Config Buttons
+  // --- Action Buttons ---
   const btnRow = document.createElement('div');
   btnRow.style.display = 'flex';
-  btnRow.style.gap = '10px';
-  btnRow.style.marginTop = '20px';
+  btnRow.style.gap = '8px';
+  btnRow.style.marginTop = '16px';
+  btnRow.style.paddingTop = '16px';
+  btnRow.style.borderTop = '1px solid rgba(255,255,255,0.1)';
+
+  const saveBtn = createButton(t('saveState', lang), () => {
+    point.saveState();
+    const originalText = saveBtn.textContent;
+    saveBtn.textContent = 'OK!';
+    saveBtn.style.background = '#10b981';
+    setTimeout(() => {
+      saveBtn.textContent = originalText;
+      saveBtn.style.background = '#3b82f6';
+    }, 1500);
+  });
+
+  const restoreBtn = createButton(t('restoreState', lang), () => {
+    point.restoreState();
+    
+    // Refresh UI
+    heightInput.value = point.heightOffset || 0;
+    clampCheck.checked = point.heightReference === 'clampToGround';
+    
+    colorInput.value = colorToHex(point.color);
+    sizeInput.value = point.pixelSize;
+    opacityInput.value = point.opacity;
+    
+    outlineCheck.checked = point.outline;
+    outlineColorInput.value = colorToHex(point.outlineColor || '#FFFFFF');
+    outlineWidthInput.value = point.outlineWidth || 2;
+    
+    flashCheck.checked = !!point._flashing;
+    flashDurationInput.value = Number.isFinite(point._debugFlashDuration) ? point._debugFlashDuration : 1000;
+    
+    nearInput.value = point.distanceDisplayCondition ? point.distanceDisplayCondition.near : 0;
+    farInput.value = point.distanceDisplayCondition ? point.distanceDisplayCondition.far : '';
+    
+    minHeightInput.value = point.minDisplayHeight || 0;
+    maxHeightInput.value = Number.isFinite(point.maxDisplayHeight) ? point.maxDisplayHeight : '';
+    
+    snInput.value = point.scaleByDistance ? point.scaleByDistance.near : '';
+    snvInput.value = point.scaleByDistance ? point.scaleByDistance.nearValue : '';
+    sfInput.value = point.scaleByDistance ? point.scaleByDistance.far : '';
+    sfvInput.value = point.scaleByDistance ? point.scaleByDistance.farValue : '';
+    
+    tnInput.value = point.translucencyByDistance ? point.translucencyByDistance.near : '';
+    tnvInput.value = point.translucencyByDistance ? point.translucencyByDistance.nearValue : '';
+    tfInput.value = point.translucencyByDistance ? point.translucencyByDistance.far : '';
+    tfvInput.value = point.translucencyByDistance ? point.translucencyByDistance.farValue : '';
+    
+    depthTestCheck.checked = point.disableDepthTestDistance === Number.POSITIVE_INFINITY;
+  }, 'secondary');
+
+  btnRow.appendChild(saveBtn);
+  btnRow.appendChild(restoreBtn);
+  container.appendChild(btnRow);
+  
+  // --- Copy Buttons ---
+  const copyRow = document.createElement('div');
+  copyRow.style.display = 'flex';
+  copyRow.style.gap = '8px';
+  copyRow.style.marginTop = '8px';
 
   const copyNativeBtn = createButton(t('copyNative', lang), () => {
     const isRelative = point.heightReference === 'relativeToGround';
-    const h = isRelative ? (point.heightOffset || 0) : (point.position[2] || 0) + (point.heightOffset || 0);
+    const h = isRelative ? (point.heightOffset || 0) : (point.position[2] || 0);
     
-    let nativeCode = `viewer.entities.add({\n` +
+    let code = `viewer.entities.add({\n` +
       `  position: Cesium.Cartesian3.fromDegrees(${point.position[0]}, ${point.position[1]}, ${h}),\n` +
       `  point: {\n` +
-      `    pixelSize: ${point.pixelSize},\n` +
       `    color: Cesium.Color.fromCssColorString('${point.color}').withAlpha(${point.opacity}),\n` +
+      `    pixelSize: ${point.pixelSize},\n` +
       `    outlineWidth: ${point.outline ? point.outlineWidth : 0},\n` +
-      `    outlineColor: ${point.outline ? `Cesium.Color.fromCssColorString('${point.outlineColor}').withAlpha(${point.opacity})` : 'Cesium.Color.TRANSPARENT'},\n`;
+      `    outlineColor: Cesium.Color.fromCssColorString('${point.outlineColor}').withAlpha(${point.opacity}),\n`;
 
     if (point.heightReference === 'clampToGround') {
-        nativeCode += `    heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,\n`;
+        code += `    heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,\n`;
     } else if (point.heightReference === 'relativeToGround') {
-        nativeCode += `    heightReference: Cesium.HeightReference.RELATIVE_TO_GROUND,\n`;
+        code += `    heightReference: Cesium.HeightReference.RELATIVE_TO_GROUND,\n`;
     }
 
     if (point.disableDepthTestDistance === Number.POSITIVE_INFINITY) {
-        nativeCode += `    disableDepthTestDistance: Number.POSITIVE_INFINITY,\n`;
+        code += `    disableDepthTestDistance: Number.POSITIVE_INFINITY,\n`;
     }
 
     if (point.distanceDisplayCondition) {
-        nativeCode += `    distanceDisplayCondition: new Cesium.DistanceDisplayCondition(${point.distanceDisplayCondition.near}, ${point.distanceDisplayCondition.far}),\n`;
-    }
-
-    if (point.scaleByDistance) {
-        nativeCode += `    scaleByDistance: new Cesium.NearFarScalar(${point.scaleByDistance.near}, ${point.scaleByDistance.nearValue}, ${point.scaleByDistance.far}, ${point.scaleByDistance.farValue}),\n`;
+        code += `    distanceDisplayCondition: new Cesium.DistanceDisplayCondition(${point.distanceDisplayCondition.near}, ${point.distanceDisplayCondition.far}),\n`;
     }
     
-    if (point.translucencyByDistance) {
-        nativeCode += `    translucencyByDistance: new Cesium.NearFarScalar(${point.translucencyByDistance.near}, ${point.translucencyByDistance.nearValue}, ${point.translucencyByDistance.far}, ${point.translucencyByDistance.farValue}),\n`;
+    if (point.scaleByDistance) {
+        code += `    scaleByDistance: new Cesium.NearFarScalar(${point.scaleByDistance.near}, ${point.scaleByDistance.nearValue}, ${point.scaleByDistance.far}, ${point.scaleByDistance.farValue}),\n`;
     }
 
-    nativeCode += `  }\n});`;
+    if (point.translucencyByDistance) {
+        code += `    translucencyByDistance: new Cesium.NearFarScalar(${point.translucencyByDistance.near}, ${point.translucencyByDistance.nearValue}, ${point.translucencyByDistance.far}, ${point.translucencyByDistance.farValue}),\n`;
+    }
 
-    navigator.clipboard.writeText(nativeCode)
-      .then(() => {
+    code += `  }\n});`;
+
+    navigator.clipboard.writeText(code).then(() => {
         const originalText = copyNativeBtn.textContent;
         copyNativeBtn.textContent = t('copied', lang);
         copyNativeBtn.style.background = '#10b981';
@@ -628,11 +745,11 @@ export function renderPointDebugger(container, point, lang = 'zh') {
           copyNativeBtn.textContent = originalText;
           copyNativeBtn.style.background = '#3b82f6';
         }, 2000);
-      });
+    });
   });
 
   const copyChainBtn = createButton(t('copyChain', lang), () => {
-    let chain = `entity.point({\n` +
+    let code = `entity.point({\n` +
       `  color: '${point.color}',\n` +
       `  pixelSize: ${point.pixelSize},\n` +
       `  opacity: ${point.opacity},\n` +
@@ -641,44 +758,36 @@ export function renderPointDebugger(container, point, lang = 'zh') {
       `  outlineWidth: ${point.outlineWidth}`;
 
     if (point.heightReference === 'clampToGround') {
-      chain += `,\n  heightReference: 'clampToGround'`;
+        code += `,\n  heightReference: 'clampToGround'`;
     } else if (point.heightReference === 'relativeToGround') {
-      chain += `,\n  heightReference: 'relativeToGround'`;
-    }
-
-    if (point.heightOffset !== 0) {
-      chain += `,\n  heightOffset: ${point.heightOffset}`;
+        code += `,\n  heightReference: 'relativeToGround'`;
     }
     
-    if (point.distanceDisplayCondition) {
-        chain += `,\n  distanceDisplayCondition: { near: ${point.distanceDisplayCondition.near}, far: ${point.distanceDisplayCondition.far} }`;
+    if (point.heightOffset !== 0) {
+        code += `,\n  heightOffset: ${point.heightOffset}`;
     }
-    if (point.scaleByDistance) {
-        chain += `,\n  scaleByDistance: { near: ${point.scaleByDistance.near}, nearValue: ${point.scaleByDistance.nearValue}, far: ${point.scaleByDistance.far}, farValue: ${point.scaleByDistance.farValue} }`;
-    }
-    if (point.translucencyByDistance) {
-        chain += `,\n  translucencyByDistance: { near: ${point.translucencyByDistance.near}, nearValue: ${point.translucencyByDistance.nearValue}, far: ${point.translucencyByDistance.far}, farValue: ${point.translucencyByDistance.farValue} }`;
-    }
+
     if (point.disableDepthTestDistance === Number.POSITIVE_INFINITY) {
-        chain += `,\n  disableDepthTestDistance: true`;
+        code += `,\n  disableDepthTestDistance: true`;
     }
 
-    if (point.minDisplayHeight && point.minDisplayHeight !== 0) {
-        chain += `,\n  minDisplayHeight: ${point.minDisplayHeight}`;
+    if (point.distanceDisplayCondition) {
+        code += `,\n  distanceDisplayCondition: { near: ${point.distanceDisplayCondition.near}, far: ${point.distanceDisplayCondition.far} }`;
     }
-    if (Number.isFinite(point.maxDisplayHeight) && point.maxDisplayHeight !== Infinity) {
-        chain += `,\n  maxDisplayHeight: ${point.maxDisplayHeight}`;
-    }
-
-    chain += `\n})`;
-
-    if (point._flashing) {
-      const d = Number.isFinite(point._debugFlashDuration) ? point._debugFlashDuration : 1000;
-      chain += `\n.flash(true, ${d})`;
+    
+    if (point.scaleByDistance) {
+        code += `,\n  scaleByDistance: { near: ${point.scaleByDistance.near}, nearValue: ${point.scaleByDistance.nearValue}, far: ${point.scaleByDistance.far}, farValue: ${point.scaleByDistance.farValue} }`;
     }
 
-    navigator.clipboard.writeText(chain)
-      .then(() => {
+
+
+    if (point.translucencyByDistance) {
+        code += `,\n  translucencyByDistance: { near: ${point.translucencyByDistance.near}, nearValue: ${point.translucencyByDistance.nearValue}, far: ${point.translucencyByDistance.far}, farValue: ${point.translucencyByDistance.farValue} }`;
+    }
+
+    code += `\n})`;
+
+    navigator.clipboard.writeText(code).then(() => {
         const originalText = copyChainBtn.textContent;
         copyChainBtn.textContent = t('copied', lang);
         copyChainBtn.style.background = '#10b981';
@@ -686,10 +795,10 @@ export function renderPointDebugger(container, point, lang = 'zh') {
           copyChainBtn.textContent = originalText;
           copyChainBtn.style.background = 'rgba(255,255,255,0.1)';
         }, 2000);
-      });
+    });
   }, 'secondary');
 
-  btnRow.appendChild(copyNativeBtn);
-  btnRow.appendChild(copyChainBtn);
-  container.appendChild(btnRow);
+  copyRow.appendChild(copyNativeBtn);
+  copyRow.appendChild(copyChainBtn);
+  container.appendChild(copyRow);
 }

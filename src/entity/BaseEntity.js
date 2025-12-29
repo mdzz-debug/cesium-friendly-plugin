@@ -31,6 +31,13 @@ export class BaseEntity {
     // Display Condition (Height)
     this.minDisplayHeight = options.minDisplayHeight !== undefined ? options.minDisplayHeight : 0;
     this.maxDisplayHeight = options.maxDisplayHeight !== undefined ? options.maxDisplayHeight : Infinity;
+
+    // Support options.displayCondition object for consistency with setDisplayCondition
+    if (options.displayCondition) {
+        if (options.displayCondition.min !== undefined) this.minDisplayHeight = options.displayCondition.min;
+        if (options.displayCondition.max !== undefined) this.maxDisplayHeight = options.displayCondition.max;
+    }
+
     this._heightVisible = true;
     this._heightListenerUnsubscribe = null;
     this.updateVisibilityByHeight = this.updateVisibilityByHeight.bind(this);
@@ -84,8 +91,11 @@ export class BaseEntity {
     }
 
     // Register with manager
-    pointsManager.registerPoint(this, this.options); 
+    pointsManager.registerEntity(this, this.options); 
     
+    // Auto-save initial state so restoreState() works without manual save
+    this.saveState();
+
     this._enableHeightCheck();
     this._updateFinalVisibility();
   }
@@ -93,12 +103,14 @@ export class BaseEntity {
   show() {
     this._hidden = false;
     this._updateFinalVisibility();
+    this.trigger('change', this);
     return this;
   }
 
   hide() {
     this._hidden = true;
     this._updateFinalVisibility();
+    this.trigger('change', this);
     return this;
   }
 
@@ -134,24 +146,283 @@ export class BaseEntity {
     }
   }
 
+  // --- Update API ---
+
+  update(options, duration = 0) {
+    if (!options || typeof options !== 'object') return this;
+    
+    // Animation Hook
+    if (duration > 0) {
+       return this._animateUpdate(options, duration);
+    }
+    
+    Object.keys(options).forEach(key => {
+        const value = options[key];
+        
+        // 1. Delegate to composition methods
+        if (key === 'label' && typeof this.label === 'function') {
+            this.label(value);
+            return;
+        }
+        if (key === 'billboard' && typeof this.billboard === 'function') {
+            this.billboard(value);
+            return;
+        }
+
+        // 2. Try setter: setKey(val)
+        const setterName = 'set' + key.charAt(0).toUpperCase() + key.slice(1);
+        if (typeof this[setterName] === 'function') {
+            this[setterName](value);
+        } 
+        // 3. Special properties
+        else if (key === 'position') {
+             if (typeof this.setPosition === 'function') {
+                 this.setPosition(value);
+             } else {
+                 this.position = value;
+             }
+        }
+        // 4. Direct property set
+        else {
+             this[key] = value;
+             if (this.entity && (key === 'name' || key === 'description')) {
+                 this.entity[key] = value;
+             }
+        }
+    });
+    this.trigger('change', this);
+    return this;
+  }
+
+  // --- Animation ---
+
+  /**
+   * 开启链式动画模式。
+   * 示例: entity.animate(2000).setColor('red').setPixelSize(20).update();
+   * @param {number} duration 动画时长 (ms)
+   * @returns {Proxy} 代理对象，拦截 set 方法并记录目标值，最后调用 update() 或 start() 触发动画
+   */
+  animate(duration = 1000) {
+    const pendingOptions = {};
+    const self = this;
+
+    return new Proxy(this, {
+      get(target, prop, receiver) {
+        // 1. Trigger methods
+        
+        // update(): Execute animation with pending options
+        if (prop === 'update') {
+            return () => {
+                return self.update(pendingOptions, duration);
+            };
+        }
+        
+        // Intercept lifecycle methods that support animation
+        if (prop === 'add') {
+            return () => self.add(duration);
+        }
+        if (prop === 'restoreState') {
+            return () => self.restoreState(duration);
+        }
+
+        // 2. 拦截 Setter
+        if (typeof prop === 'string' && prop.startsWith('set')) {
+            return (...args) => {
+                let key = prop.slice(3);
+                if (key.length > 0) {
+                    key = key.charAt(0).toLowerCase() + key.slice(1);
+                    
+                    // 处理特殊的多参数 Setter
+                    if (prop === 'setOutline') {
+                         if (args[0] !== undefined) pendingOptions.outline = args[0];
+                         if (args[1] !== undefined) pendingOptions.outlineColor = args[1];
+                         if (args[2] !== undefined) pendingOptions.outlineWidth = args[2];
+                    }
+                    else if (prop === 'setPixelOffset') {
+                        if (args.length >= 2) pendingOptions.pixelOffset = { x: args[0], y: args[1] };
+                        else pendingOptions.pixelOffset = args[0];
+                    }
+                    else if (prop === 'setEyeOffset') {
+                         if (args.length >= 3) pendingOptions.eyeOffset = { x: args[0], y: args[1], z: args[2] };
+                         else pendingOptions.eyeOffset = args[0];
+                    }
+                    // 默认单参数 Setter
+                    else {
+                        if (args.length > 0) pendingOptions[key] = args[0];
+                    }
+                }
+                return receiver; // 返回代理以支持链式调用
+            };
+        }
+
+        // 3. 透传其他属性/方法
+        const val = Reflect.get(target, prop, receiver);
+        if (typeof val === 'function') {
+             return val.bind(target);
+        }
+        return val;
+      }
+    });
+  }
+
+  _animateUpdate(targetOptions, duration) {
+    // 1. Identify animatable properties and their start/end values
+    const props = [];
+    const Cesium = this.cesium;
+    
+    // Stop any existing update animation
+    if (this._updateTimer) {
+        clearInterval(this._updateTimer);
+        this._updateTimer = null;
+    }
+
+    Object.keys(targetOptions).forEach(key => {
+        const endVal = targetOptions[key];
+        const startVal = this[key];
+
+        // Skip if values are same (shallow check)
+        if (endVal === startVal) return;
+        
+        // Skip special composed properties for now (billboard, label) unless we recurse
+        // We only animate direct properties on this entity
+        if (key === 'billboard' || key === 'label') return;
+
+        // A. Number Interpolation (opacity, scale, pixelSize, rotation, width, height, etc)
+        if (typeof endVal === 'number' && typeof startVal === 'number') {
+            props.push({
+                key,
+                type: 'number',
+                start: startVal,
+                end: endVal
+            });
+        }
+        // B. Color Interpolation (color, outlineColor, fillColor, etc)
+        // Check if key contains 'Color' or is 'color'
+        else if ((key.toLowerCase().includes('color')) && typeof endVal === 'string') {
+             try {
+                 const c1 = Cesium.Color.fromCssColorString(startVal || '#FFFFFF');
+                 const c2 = Cesium.Color.fromCssColorString(endVal);
+                 props.push({
+                     key,
+                     type: 'color',
+                     start: c1,
+                     end: c2
+                 });
+             } catch (e) {
+                 // Fallback: just set it at end
+                 console.warn('Animation color parse error', e);
+             }
+        }
+        // C. Position Interpolation
+        else if (key === 'position' && Array.isArray(endVal) && Array.isArray(startVal)) {
+            // Assume [lng, lat, alt]
+            // We can interpolate linearly on these coordinates for short distances
+            // Or convert to Cartesian3, lerp, and convert back?
+            // Simple linear on [lng, lat, alt] is usually fine for local movements.
+            props.push({
+                key,
+                type: 'array',
+                start: [...startVal],
+                end: [...endVal]
+            });
+        }
+        // D. Non-animatable: Apply at end
+        else {
+            // We'll just apply these at the very end of the animation
+            props.push({
+                key,
+                type: 'value',
+                end: endVal
+            });
+        }
+    });
+
+    if (props.length === 0) return this;
+
+    // 2. Start Animation Loop
+    const startTime = Date.now();
+    const frameRate = 30; // 30fps is enough for property updates usually
+    const interval = 1000 / frameRate;
+    
+    this._updateTimer = setInterval(() => {
+        const now = Date.now();
+        const elapsed = now - startTime;
+        let t = elapsed / duration;
+        
+        if (t >= 1) {
+            t = 1;
+            clearInterval(this._updateTimer);
+            this._updateTimer = null;
+        }
+
+        // Apply Easing? (Optional, Linear for now)
+        // t = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t; // EaseInOutQuad
+
+        const currentOptions = {};
+        
+        props.forEach(p => {
+            if (p.type === 'number') {
+                const val = p.start + (p.end - p.start) * t;
+                currentOptions[p.key] = val;
+            } 
+            else if (p.type === 'color') {
+                const col = Cesium.Color.lerp(p.start, p.end, t, new Cesium.Color());
+                // Convert back to CSS string for the setter
+                currentOptions[p.key] = col.toCssColorString();
+            }
+            else if (p.type === 'array') {
+                 const val = p.start.map((v, i) => {
+                     const e = p.end[i] !== undefined ? p.end[i] : v;
+                     return v + (e - v) * t;
+                 });
+                 currentOptions[p.key] = val;
+            }
+            else if (p.type === 'value' && t === 1) {
+                 currentOptions[p.key] = p.end;
+            }
+        });
+
+        // Apply updates using existing update method (duration=0)
+        // We use the existing update logic so it handles setters, dirty checking, etc.
+        // This might trigger 'change' event many times.
+        this.update(currentOptions, 0);
+
+    }, interval);
+
+    return this;
+  }
+
   // --- Chainable Setters ---
 
-  setDisplayCondition(min, max) {
-    this.minDisplayHeight = min !== undefined ? min : 0;
-    // Fix: Treat 0 as Infinity for maxDisplayHeight to mean "no limit"
-    this.maxDisplayHeight = (max !== undefined && max !== 0) ? max : Infinity;
+  setDisplayCondition(options) {
+    const { min, max } = options || {};
     
-    // Re-evaluate if height check is needed
+    // Use current values if defined, otherwise defaults
+    const currentMin = this.minDisplayHeight !== undefined ? this.minDisplayHeight : 0;
+    const currentMax = this.maxDisplayHeight !== undefined ? this.maxDisplayHeight : Infinity;
+
+    this.minDisplayHeight = min !== undefined ? min : currentMin;
+    
+    // Default max to min * 10 or min + 10000 to ensure reasonable visibility range if not specified
+    // But for DisplayCondition (min/max height), Infinity is often desired. 
+    // However, if user updates min and wants a constrained range but forgets max, Infinity might be unexpected.
+    // Let's stick to Infinity as default for max height as it's standard Cesium behavior (visible from min to space).
+    // So we only override if max is explicitly provided or currentMax exists.
+    let newMax = max !== undefined ? max : currentMax;
+    
+    // Ensure max > min
+    if (newMax !== Infinity && newMax <= this.minDisplayHeight) {
+        newMax = Infinity;
+    }
+    this.maxDisplayHeight = newMax;
+
     this._disableHeightCheck();
     this._enableHeightCheck();
-    
-    // Trigger immediate check to update visibility right now
     if (this._heightListenerUnsubscribe) {
        const hl = getHeightListener(this.viewer, this.cesium);
        const currentHeight = hl.getCurrentHeight();
        this.updateVisibilityByHeight(currentHeight);
     }
-    
     return this;
   }
 
@@ -162,10 +433,11 @@ export class BaseEntity {
     if (oldGroup !== this.group) {
       pointsManager.updateGroup(this, oldGroup, this.group);
     }
+    this.trigger('change', this);
     return this;
   }
 
-  destroy() {
+  delete() {
     if (this._destroyed) return;
     this._destroyed = true;
 
@@ -182,8 +454,8 @@ export class BaseEntity {
     }
     
     // Remove from manager
-    // Note: pointsManager.removePoint calls point.destroy(), so the flag prevents recursion
-    pointsManager.removePoint(this.id);
+    // Note: pointsManager.removeEntity calls point.delete(), so the flag prevents recursion
+    pointsManager.removeEntity(this.id);
     
     this.entity = null;
     this._eventHandlers.clear();
@@ -197,7 +469,7 @@ export class BaseEntity {
         // Iterate copy to destroy peers
         [...collection].forEach(peer => {
             if (peer !== this && !peer._destroyed) {
-                peer.destroy();
+                peer.delete();
             }
         });
     }
@@ -237,17 +509,9 @@ export class BaseEntity {
 
   // --- Behavior ---
 
-  setGroup(groupName) {
-    const oldGroup = this.group;
-    this.group = groupName || null;
-    pointsManager.updateGroup(this, oldGroup, this.group);
-    
-    // If geometry entity, might need to check duplicates, but that's lower down
-    return this;
-  }
-
   setTTL(ms) {
     pointsManager.updateTTL(this.id, ms);
+    this.trigger('change', this);
     return this;
   }
 
@@ -258,11 +522,12 @@ export class BaseEntity {
       }
       const ttl = timestamp - Date.now();
       if (ttl <= 0) {
-        this.destroy();
+        this.delete();
       } else {
         pointsManager.updateTTL(this.id, ttl);
       }
     }
+    this.trigger('change', this);
     return this;
   }
 
@@ -340,18 +605,47 @@ export class BaseEntity {
 
   // --- Composition Proxies ---
 
-  label(options) {
-    if (!options) return this;
+  _createProxy(createFn, EntityClassType) {
+      const self = this;
+      const proxy = new Proxy(createFn, {
+          get(target, prop, receiver) {
+              if (prop in target) {
+                  return Reflect.get(target, prop, receiver);
+              }
+              
+              const Types = BaseEntity.Types;
+              const EntityClass = Types && Types[EntityClassType];
+              
+              if (EntityClass && EntityClass.prototype && prop in EntityClass.prototype) {
+                  // Reuse existing entity of this type if available in collection
+                  // This prevents creating duplicate labels/billboards when accessing the property multiple times
+                  let entity = null;
+                  if (self._entityCollection) {
+                      entity = self._entityCollection.find(e => e instanceof EntityClass);
+                  }
+                  
+                  if (!entity) {
+                      entity = createFn();
+                  }
+                  
+                  const value = entity[prop];
+                  if (typeof value === 'function') {
+                      return value.bind(entity);
+                  }
+                  return value;
+              }
+              return undefined;
+          }
+      });
+      return proxy;
+  }
 
+  _createLabel(options) {
     const Types = BaseEntity.Types;
     if (Types && Types.LabelEntity) {
-        // Create new LabelEntity
-        // Generate a sub-ID. 
-        // Note: Chaining multiple labels? We append unique suffix.
-        const id = this.id + '_label_' + Math.random().toString(36).substr(2, 5);
+        options = options || {};
         
-        // Inherit position and other relevant context
-        // Try to get position from this entity if available (GeometryEntity has it)
+        const id = this.id + '_label_' + Math.random().toString(36).substr(2, 5);
         const pos = this.position || (this.options ? this.options.position : undefined);
         
         const newOpts = {
@@ -362,40 +656,20 @@ export class BaseEntity {
         };
         
         const next = new Types.LabelEntity(id, this.viewer, this.cesium, newOpts);
-        
-        // Share the collection
         next._entityCollection = this._entityCollection;
         this._entityCollection.push(next);
-        
         return next;
     }
-
-    console.warn('CesiumFriendlyPlugin: LabelEntity not registered. Cannot create separate label entity.');
+    console.warn('CesiumFriendlyPlugin: LabelEntity not registered.');
     return this;
   }
 
-  // Aliases for compatibility
-  showLabel(options) { return this.label(options); }
-  updateLabel(options) { return this.label(options); } // Create new one? Or update existing?
-  // updateLabel implies updating an existing label. 
-  // With separate entities, we need to find the label entity in the collection.
-  // This is a tricky part of the migration.
-  // If the user does entity.point().billboard().updateLabel(), they might expect to update the label attached to the group?
-  // But typically updateLabel is called on the object that HAS the label.
-  // If we return LabelEntity, then `.updateLabel` on it is just `label(newOptions)`?
-  // Or `setText`?
-  // Let's implement updateLabel to find the first LabelEntity in the group and update it.
-  
-  hideLabel() { 
-      // Find label in group and hide it
-      const labelEnt = this._entityCollection.find(e => e.type === 'label');
-      if (labelEnt) labelEnt.hide();
-      return this; 
-  }
-  
-  setLabel(options) { return this.label(options); }
+  get label() {
+       const fn = (options) => this._createLabel(options);
+       return this._createProxy(fn, 'LabelEntity');
+   }
 
-  _getHorizontalOrigin(origin) {
+   _getHorizontalOrigin(origin) {
       if (typeof origin === 'number') return origin;
       if (typeof origin === 'string') {
           const upper = origin.toUpperCase();
@@ -404,9 +678,9 @@ export class BaseEntity {
           if (upper === 'RIGHT') return this.cesium.HorizontalOrigin.RIGHT;
       }
       return this.cesium.HorizontalOrigin.CENTER;
-  }
+   }
 
-  _getVerticalOrigin(origin) {
+   _getVerticalOrigin(origin) {
       if (typeof origin === 'number') return origin;
       if (typeof origin === 'string') {
           const upper = origin.toUpperCase();
@@ -416,13 +690,11 @@ export class BaseEntity {
           if (upper === 'BASELINE') return this.cesium.VerticalOrigin.BASELINE;
       }
       return this.cesium.VerticalOrigin.BOTTOM;
-  }
-
-  billboard(img, options = {}) {
-      if (!img && !options) return this;
-      
+   }
+ 
+   _createBillboard(img, options = {}) {
       // Handle img argument flexibility
-      if (typeof img === 'object') {
+      if (typeof img === 'object' && img !== null) {
           options = img;
           img = options.image;
       } else {
@@ -432,7 +704,6 @@ export class BaseEntity {
       const Types = BaseEntity.Types;
       if (Types && Types.BillboardEntity) {
           const id = this.id + '_billboard_' + Math.random().toString(36).substr(2, 5);
-          
           const pos = this.position || (this.options ? this.options.position : undefined);
           
           const newOpts = {
@@ -443,10 +714,8 @@ export class BaseEntity {
           };
           
           const next = new Types.BillboardEntity(id, this.viewer, this.cesium, newOpts);
-          
           next._entityCollection = this._entityCollection;
           this._entityCollection.push(next);
-          
           return next;
       }
       
@@ -454,15 +723,13 @@ export class BaseEntity {
       return this;
   }
 
-  // Aliases for compatibility
-  showBillboard(options) { return this.billboard(options); }
-  updateBillboard(options) { return this.billboard(options); } 
-  hideBillboard() { 
-      const bb = this._entityCollection.find(e => e.type === 'billboard');
-      if (bb) bb.hide();
-      return this;
+  get billboard() {
+      const fn = (img, options) => this._createBillboard(img, options);
+      return this._createProxy(fn, 'BillboardEntity');
   }
-  setBillboard(options) { return this.billboard(options); }
+
+
+
 
   // --- Internal ---
   

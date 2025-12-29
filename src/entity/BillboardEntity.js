@@ -66,9 +66,24 @@ export class BillboardEntity extends GeometryEntity {
         verticalOrigin: this._getVerticalOrigin(this.verticalOrigin),
         distanceDisplayCondition: this.distanceDisplayCondition ? 
             new Cesium.DistanceDisplayCondition(this.distanceDisplayCondition.near, this.distanceDisplayCondition.far) : undefined,
-        scaleByDistance: this.scaleByDistance,
-        translucencyByDistance: this.translucencyByDistance,
-        pixelOffsetScaleByDistance: this.pixelOffsetScaleByDistance,
+        scaleByDistance: this.scaleByDistance ? new Cesium.NearFarScalar(
+            this.scaleByDistance.near, 
+            this.scaleByDistance.nearValue, 
+            this.scaleByDistance.far, 
+            this.scaleByDistance.farValue
+        ) : undefined,
+        translucencyByDistance: this.translucencyByDistance ? new Cesium.NearFarScalar(
+            this.translucencyByDistance.near, 
+            this.translucencyByDistance.nearValue, 
+            this.translucencyByDistance.far, 
+            this.translucencyByDistance.farValue
+        ) : undefined,
+        pixelOffsetScaleByDistance: this.pixelOffsetScaleByDistance ? new Cesium.NearFarScalar(
+            this.pixelOffsetScaleByDistance.near, 
+            this.pixelOffsetScaleByDistance.nearValue, 
+            this.pixelOffsetScaleByDistance.far, 
+            this.pixelOffsetScaleByDistance.farValue
+        ) : undefined,
         disableDepthTestDistance: this.disableDepthTestDistance,
         heightReference: this._getHeightReferenceEnum()
     };
@@ -91,148 +106,65 @@ export class BillboardEntity extends GeometryEntity {
   // --- Style Setters ---
 
   setImage(url) {
-    const resolved = resolveImageInput(url);
-    this.imageUrl = resolved;
+    this.imageUrl = resolveImageInput(url);
     if (this.entity && this.entity.billboard) {
-      this.entity.billboard.image = resolved;
+        this.entity.billboard.image = this.imageUrl;
     }
-    return this;
-  }
-
-  setScale(scale) {
-    this.scale = scale;
-    if (this.entity && this.entity.billboard) {
-      this.entity.billboard.scale = scale;
-    }
+    this.trigger('change', this);
     return this;
   }
 
   setRotation(degree) {
     this.rotation = degree;
     if (this.entity && this.entity.billboard) {
-      this.entity.billboard.rotation = this.cesium.Math.toRadians(degree);
+        this.entity.billboard.rotation = this.cesium.Math.toRadians(this.rotation);
     }
+    this.trigger('change', this);
     return this;
   }
 
   setColor(color) {
     this.color = color;
     if (this.entity && this.entity.billboard) {
-      const col = this.cesium.Color.fromCssColorString(color).withAlpha(this.opacity);
-      this.entity.billboard.color = col;
+        this.entity.billboard.color = this.cesium.Color.fromCssColorString(this.color).withAlpha(this.opacity);
     }
+    this.trigger('change', this);
     return this;
   }
 
   setOpacity(alpha) {
     this.opacity = alpha;
     if (this.entity && this.entity.billboard) {
-      const c = this.cesium.Color.fromCssColorString(this.color).withAlpha(alpha);
-      this.entity.billboard.color = c;
+        this.entity.billboard.color = this.cesium.Color.fromCssColorString(this.color).withAlpha(this.opacity);
     }
+    this.trigger('change', this);
     return this;
   }
   
-  setPixelOffset(x, y) {
-    this.pixelOffset = [x, y];
-    if (this.entity && this.entity.billboard) {
-        this.entity.billboard.pixelOffset = new this.cesium.Cartesian2(x, y);
-    }
-    return this;
-  }
-
-  setEyeOffset(x, y, z) {
-    this.eyeOffset = [x, y, z];
-    if (this.entity && this.entity.billboard) {
-        this.entity.billboard.eyeOffset = new this.cesium.Cartesian3(x, y, z);
-    }
-    return this;
-  }
-  
-  setDisableDepthTestDistance(distance) {
-    if (distance === true) {
-        this.disableDepthTestDistance = Number.POSITIVE_INFINITY;
-    } else if (distance === false) {
-        this.disableDepthTestDistance = undefined;
-    } else {
-        this.disableDepthTestDistance = distance;
-    }
-
-    if (this.entity && this.entity.billboard) {
-        this.entity.billboard.disableDepthTestDistance = this.disableDepthTestDistance;
-    }
-    return this;
-  }
-
   setImageWidth(width) {
     this.width = width;
     if (this.entity && this.entity.billboard) {
-      this.entity.billboard.width = width;
+        this.entity.billboard.width = this.width;
     }
+    this.trigger('change', this);
     return this;
   }
 
   setImageHeight(height) {
     this.height = height;
     if (this.entity && this.entity.billboard) {
-      this.entity.billboard.height = height;
+        this.entity.billboard.height = this.height;
     }
+    this.trigger('change', this);
     return this;
   }
 
   setSizeInMeters(enable) {
     this.sizeInMeters = enable;
     if (this.entity && this.entity.billboard) {
-      this.entity.billboard.sizeInMeters = enable;
+        this.entity.billboard.sizeInMeters = this.sizeInMeters;
     }
-    return this;
-  }
-
-  setHorizontalOrigin(origin) {
-    this.horizontalOrigin = origin;
-    if (this.entity && this.entity.billboard) {
-      this.entity.billboard.horizontalOrigin = this._getHorizontalOrigin(origin);
-    }
-    return this;
-  }
-
-  setVerticalOrigin(origin) {
-    this.verticalOrigin = origin;
-    if (this.entity && this.entity.billboard) {
-      this.entity.billboard.verticalOrigin = this._getVerticalOrigin(origin);
-    }
-    return this;
-  }
-
-  setDistanceDisplayCondition(near, far) {
-    this.distanceDisplayCondition = { near, far };
-    if (this.entity && this.entity.billboard) {
-        this.entity.billboard.distanceDisplayCondition = new this.cesium.DistanceDisplayCondition(near, far);
-    }
-    return this;
-  }
-
-  setScaleByDistance(near, nearValue, far, farValue) {
-    this.scaleByDistance = { near, nearValue, far, farValue };
-    if (this.entity && this.entity.billboard) {
-        this.entity.billboard.scaleByDistance = new this.cesium.NearFarScalar(near, nearValue, far, farValue);
-    }
-    return this;
-  }
-
-  setTranslucencyByDistance(near, nearValue, far, farValue) {
-    this.translucencyByDistance = { near, nearValue, far, farValue };
-    if (this.entity && this.entity.billboard) {
-        this.entity.billboard.translucencyByDistance = new this.cesium.NearFarScalar(near, nearValue, far, farValue);
-    }
-    return this;
-  }
-
-  setPixelOffsetScaleByDistance(near, nearValue, far, farValue) {
-    this.pixelOffsetScaleByDistance = { near, nearValue, far, farValue };
-    if (this.entity && this.entity.billboard) {
-        this.entity.billboard.pixelOffsetScaleByDistance = new this.cesium.NearFarScalar(near, nearValue, far, farValue);
-    }
+    this.trigger('change', this);
     return this;
   }
 
@@ -240,27 +172,59 @@ export class BillboardEntity extends GeometryEntity {
 
   saveState() {
     this._savedState = {
-      scale: this.scale,
+      scale: this.scale !== undefined ? this.scale : 1.0,
       rotation: this.rotation,
       imageUrl: this.imageUrl,
       color: this.color,
       opacity: this.opacity,
-      pixelOffset: this.pixelOffset,
-      eyeOffset: this.eyeOffset
+      pixelOffset: this.pixelOffset ? [...this.pixelOffset] : [0,0],
+      eyeOffset: this.eyeOffset ? [...this.eyeOffset] : [0,0,0],
+      width: this.width,
+      height: this.height,
+      sizeInMeters: this.sizeInMeters,
+      horizontalOrigin: this.horizontalOrigin,
+      verticalOrigin: this.verticalOrigin,
+      heightReference: this.heightReference,
+      heightOffset: this.heightOffset,
+      distanceDisplayCondition: this.distanceDisplayCondition ? {...this.distanceDisplayCondition} : undefined,
+      scaleByDistance: this.scaleByDistance ? {...this.scaleByDistance} : undefined,
+      translucencyByDistance: this.translucencyByDistance ? {...this.translucencyByDistance} : undefined,
+      pixelOffsetScaleByDistance: this.pixelOffsetScaleByDistance ? {...this.pixelOffsetScaleByDistance} : undefined,
+      disableDepthTestDistance: this.disableDepthTestDistance
     };
     return this;
   }
 
-  restoreState() {
+  restoreState(duration = 0) {
     if (this._savedState) {
       const s = this._savedState;
-      this.setScale(s.scale);
-      this.setRotation(s.rotation);
-      this.setImage(s.imageUrl);
-      this.setColor(s.color);
-      this.setOpacity(s.opacity);
-      this.setPixelOffset(s.pixelOffset[0], s.pixelOffset[1]);
-      this.setEyeOffset(s.eyeOffset[0], s.eyeOffset[1], s.eyeOffset[2]);
+      const options = {
+        scale: s.scale,
+        rotation: s.rotation,
+        image: s.imageUrl,
+        color: s.color,
+        opacity: s.opacity,
+        pixelOffset: s.pixelOffset,
+        eyeOffset: s.eyeOffset,
+        
+        imageWidth: s.width,
+        imageHeight: s.height,
+        sizeInMeters: s.sizeInMeters,
+        
+        horizontalOrigin: s.horizontalOrigin,
+        verticalOrigin: s.verticalOrigin,
+        
+        heightReference: s.heightReference,
+        height: s.heightOffset,
+        
+        distanceDisplayCondition: s.distanceDisplayCondition || null,
+        scaleByDistance: s.scaleByDistance || null,
+        translucencyByDistance: s.translucencyByDistance || null,
+        pixelOffsetScaleByDistance: s.pixelOffsetScaleByDistance || null,
+        disableDepthTestDistance: s.disableDepthTestDistance
+      };
+      
+      this.update(options, duration);
       this._savedState = null;
     }
     return this;

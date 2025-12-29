@@ -122,9 +122,9 @@ cf.label.add({
 
 ## 功能模块文档
 
-- [🖼️ 广告牌 (Billboard) API 文档](./src/billboard/README.md)
-- [📝 文字 (Label) API 文档](./src/label/README.md)
-- [📍 点位 (Point) API 文档](./src/point/README.md)
+- [🖼️ 广告牌 (Billboard) API 文档](./src/doc/BillboardMethods.md)
+- [📝 文字 (Label) API 文档](./src/doc/LabelMethods.md)
+- [📍 点位 (Point) API 文档](./src/doc/PointMethods.md)
   - 基础点位、样式设置、有效期（TTL）、批量管理。
 
 ## Vue 集成

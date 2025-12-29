@@ -9,15 +9,19 @@ export class PointEntity extends GeometryEntity {
     // Style props
     this.color = options.color || '#FF0000';
     this.pixelSize = options.pixelSize || 10;
+    this.scale = options.scale !== undefined ? options.scale : 1.0;
     this.opacity = options.opacity != null ? options.opacity : 1;
     this.outline = options.outline || false;
     this.outlineColor = options.outlineColor || '#FFFFFF';
     this.outlineWidth = options.outlineWidth || 2;
     
     // Advanced props
+    this.pixelOffset = options.pixelOffset; // {x, y}
+    this.eyeOffset = options.eyeOffset; // {x, y, z}
     this.distanceDisplayCondition = options.distanceDisplayCondition;
     this.scaleByDistance = options.scaleByDistance;
     this.translucencyByDistance = options.translucencyByDistance;
+    this.pixelOffsetScaleByDistance = options.pixelOffsetScaleByDistance;
     this.disableDepthTestDistance = options.disableDepthTestDistance;
   }
 
@@ -32,14 +36,24 @@ export class PointEntity extends GeometryEntity {
     // Initial Graphics
     const pointGraphics = new Cesium.PointGraphics({
         color: Cesium.Color.fromCssColorString(this.color).withAlpha(this.opacity),
-        pixelSize: this.pixelSize,
+        pixelSize: this.pixelSize * this.scale,
         outlineWidth: this.outline ? this.outlineWidth : 0,
         outlineColor: this.outline ? Cesium.Color.fromCssColorString(this.outlineColor).withAlpha(this.opacity) : Cesium.Color.TRANSPARENT,
         heightReference: this._getHeightReferenceEnum(),
         distanceDisplayCondition: this.distanceDisplayCondition ? 
             new Cesium.DistanceDisplayCondition(this.distanceDisplayCondition.near, this.distanceDisplayCondition.far) : undefined,
-        scaleByDistance: this.scaleByDistance,
-        translucencyByDistance: this.translucencyByDistance,
+        scaleByDistance: this.scaleByDistance ? new Cesium.NearFarScalar(
+            this.scaleByDistance.near, 
+            this.scaleByDistance.nearValue, 
+            this.scaleByDistance.far, 
+            this.scaleByDistance.farValue
+        ) : undefined,
+        translucencyByDistance: this.translucencyByDistance ? new Cesium.NearFarScalar(
+            this.translucencyByDistance.near, 
+            this.translucencyByDistance.nearValue, 
+            this.translucencyByDistance.far, 
+            this.translucencyByDistance.farValue
+        ) : undefined,
         disableDepthTestDistance: this.disableDepthTestDistance
     });
 
@@ -58,32 +72,35 @@ export class PointEntity extends GeometryEntity {
   }
   
 
-  // --- Style Setters ---
+  // --- Style Setters (Reactive) ---
 
   setColor(color) {
     this.color = color;
     if (this.entity && this.entity.point) {
-      this.entity.point.color = this.cesium.Color.fromCssColorString(color).withAlpha(this.opacity);
+        this.entity.point.color = this.cesium.Color.fromCssColorString(this.color).withAlpha(this.opacity);
     }
+    this.trigger('change', this);
     return this;
   }
 
   setPixelSize(size) {
     this.pixelSize = size;
     if (this.entity && this.entity.point) {
-      this.entity.point.pixelSize = size;
+        this.entity.point.pixelSize = this.pixelSize * this.scale;
     }
+    this.trigger('change', this);
     return this;
   }
 
   setOpacity(opacity) {
     this.opacity = opacity;
     if (this.entity && this.entity.point) {
-      this.entity.point.color = this.cesium.Color.fromCssColorString(this.color).withAlpha(opacity);
-      if (this.outline) {
-          this.entity.point.outlineColor = this.cesium.Color.fromCssColorString(this.outlineColor).withAlpha(opacity);
-      }
+        this.entity.point.color = this.cesium.Color.fromCssColorString(this.color).withAlpha(this.opacity);
+        if (this.outline) {
+            this.entity.point.outlineColor = this.cesium.Color.fromCssColorString(this.outlineColor).withAlpha(this.opacity);
+        }
     }
+    this.trigger('change', this);
     return this;
   }
 
@@ -91,51 +108,32 @@ export class PointEntity extends GeometryEntity {
     this.outline = enabled;
     if (color) this.outlineColor = color;
     if (width) this.outlineWidth = width;
-
+    
     if (this.entity && this.entity.point) {
         this.entity.point.outlineWidth = this.outline ? this.outlineWidth : 0;
-        this.entity.point.outlineColor = this.outline ? this.cesium.Color.fromCssColorString(this.outlineColor).withAlpha(this.opacity) : this.cesium.Color.TRANSPARENT;
+        this.entity.point.outlineColor = this.outline ? 
+            this.cesium.Color.fromCssColorString(this.outlineColor).withAlpha(this.opacity) : 
+            this.cesium.Color.TRANSPARENT;
     }
+    this.trigger('change', this);
     return this;
   }
 
-  setDistanceDisplayCondition(near, far) {
-    this.distanceDisplayCondition = { near, far };
-    if (this.entity && this.entity.point) {
-        this.entity.point.distanceDisplayCondition = new this.cesium.DistanceDisplayCondition(near, far);
-    }
-    return this;
-  }
+  // --- Apply Changes ---
 
-  setScaleByDistance(near, nearValue, far, farValue) {
-    this.scaleByDistance = { near, nearValue, far, farValue };
-    if (this.entity && this.entity.point) {
-        this.entity.point.scaleByDistance = new this.cesium.NearFarScalar(near, nearValue, far, farValue);
-    }
-    return this;
-  }
-
-  setTranslucencyByDistance(near, nearValue, far, farValue) {
-    this.translucencyByDistance = { near, nearValue, far, farValue };
-    if (this.entity && this.entity.point) {
-        this.entity.point.translucencyByDistance = new this.cesium.NearFarScalar(near, nearValue, far, farValue);
-    }
-    return this;
-  }
-
-  setDisableDepthTestDistance(distance) {
-    if (distance === true) {
-        this.disableDepthTestDistance = Number.POSITIVE_INFINITY;
-    } else if (distance === false) {
-        this.disableDepthTestDistance = undefined;
-    } else {
-        this.disableDepthTestDistance = distance;
-    }
-
-    if (this.entity && this.entity.point) {
-      this.entity.point.disableDepthTestDistance = this.disableDepthTestDistance;
-    }
-    return this;
+  update(options, duration) {
+      super.update(options, duration);
+      if (this.entity && this.entity.point) {
+          const Cesium = this.cesium;
+          
+          // Outline (Special handling because outlineColor/Width don't have setters and might depend on order)
+          // We re-apply outline properties to ensure consistency
+          this.entity.point.outlineWidth = this.outline ? this.outlineWidth : 0;
+          this.entity.point.outlineColor = this.outline ? 
+              Cesium.Color.fromCssColorString(this.outlineColor).withAlpha(this.opacity) : 
+              Cesium.Color.TRANSPARENT;
+      }
+      return this;
   }
 
   // --- State ---
@@ -144,22 +142,50 @@ export class PointEntity extends GeometryEntity {
     this._savedState = {
       color: this.color,
       pixelSize: this.pixelSize,
+      scale: this.scale,
       opacity: this.opacity,
       outline: this.outline,
       outlineColor: this.outlineColor,
-      outlineWidth: this.outlineWidth
-      // Label/Billboard state should be saved by BaseEntity if implemented there, 
-      // or we explicitly save it here if BaseEntity doesn't handle it yet.
+      outlineWidth: this.outlineWidth,
+      heightReference: this.heightReference,
+      heightOffset: this.heightOffset,
+      pixelOffset: this.pixelOffset ? (Array.isArray(this.pixelOffset) ? [...this.pixelOffset] : {...this.pixelOffset}) : undefined,
+      eyeOffset: this.eyeOffset ? (Array.isArray(this.eyeOffset) ? [...this.eyeOffset] : {...this.eyeOffset}) : undefined,
+      distanceDisplayCondition: this.distanceDisplayCondition ? {...this.distanceDisplayCondition} : undefined,
+      scaleByDistance: this.scaleByDistance ? {...this.scaleByDistance} : undefined,
+      translucencyByDistance: this.translucencyByDistance ? {...this.translucencyByDistance} : undefined,
+      pixelOffsetScaleByDistance: this.pixelOffsetScaleByDistance ? {...this.pixelOffsetScaleByDistance} : undefined,
+      disableDepthTestDistance: this.disableDepthTestDistance
     };
     return this;
   }
 
-  restoreState() {
+  restoreState(duration = 0) {
     if (this._savedState) {
-      this.setColor(this._savedState.color);
-      this.setPixelSize(this._savedState.pixelSize);
-      this.setOpacity(this._savedState.opacity);
-      this.setOutline(this._savedState.outline, this._savedState.outlineColor, this._savedState.outlineWidth);
+      const s = this._savedState;
+      const options = {
+        color: s.color,
+        pixelSize: s.pixelSize,
+        scale: s.scale,
+        opacity: s.opacity,
+        outline: s.outline,
+        outlineColor: s.outlineColor,
+        outlineWidth: s.outlineWidth,
+        
+        heightReference: s.heightReference,
+        height: s.heightOffset,
+        
+        pixelOffset: s.pixelOffset,
+        eyeOffset: s.eyeOffset,
+        
+        distanceDisplayCondition: s.distanceDisplayCondition || null,
+        scaleByDistance: s.scaleByDistance || null,
+        translucencyByDistance: s.translucencyByDistance || null,
+        pixelOffsetScaleByDistance: s.pixelOffsetScaleByDistance || null,
+        disableDepthTestDistance: s.disableDepthTestDistance
+      };
+      
+      this.update(options, duration);
       this._savedState = null;
     }
     return this;

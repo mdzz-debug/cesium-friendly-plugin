@@ -14,9 +14,11 @@ export class LabelEntity extends GeometryEntity {
     this.font = options.font || `${this.bold ? 'bold ' : ''}${this.fontSize}px sans-serif`;
     this.style = options.style || 'FILL';
     this.color = options.color || '#FFFFFF';
+    this.outlineColor = options.outlineColor || '#000000';
+    this.outlineWidth = options.outlineWidth || 1.0;
     this.backgroundColor = options.backgroundColor || null;
-    this.showBackground = !!options.backgroundColor;
-    this.scale = options.scale || 1.0;
+    this.showBackground = options.showBackground !== undefined ? !!options.showBackground : !!options.backgroundColor;
+    this.scale = options.scale !== undefined ? options.scale : 1.0;
     this.pixelOffset = options.pixelOffset || [0, 0];
     // Default eyeOffset to slightly forward (negative Z) to ensure label is on top
     this.eyeOffset = options.eyeOffset || [0, 0, -5];
@@ -43,7 +45,7 @@ export class LabelEntity extends GeometryEntity {
     
     // Initial Position
     const isRelative = this.heightReference === 'relativeToGround';
-    const h = isRelative ? (this.heightOffset || 0) : (this.position[2] || 0);
+    const h = isRelative ? (this.heightOffset || 0) : (this.position[2] || 0) + (this.heightOffset || 0);
     const position = Cesium.Cartesian3.fromDegrees(this.position[0], this.position[1], h);
 
     // Initial Graphics
@@ -52,6 +54,8 @@ export class LabelEntity extends GeometryEntity {
         font: this.font,
         style: Cesium.LabelStyle[this.style] || Cesium.LabelStyle.FILL,
         fillColor: Cesium.Color.fromCssColorString(this.color),
+        outlineColor: Cesium.Color.fromCssColorString(this.outlineColor),
+        outlineWidth: this.outlineWidth,
         showBackground: this.showBackground,
         backgroundColor: this.backgroundColor ? Cesium.Color.fromCssColorString(this.backgroundColor) : undefined,
         scale: this.scale,
@@ -60,10 +64,26 @@ export class LabelEntity extends GeometryEntity {
         horizontalOrigin: this._getHorizontalOrigin(this.horizontalOrigin),
         verticalOrigin: this._getVerticalOrigin(this.verticalOrigin),
         heightReference: this._getHeightReferenceEnum(),
-        distanceDisplayCondition: this.distanceDisplayCondition,
-        scaleByDistance: this.scaleByDistance,
-        translucencyByDistance: this.translucencyByDistance,
-        pixelOffsetScaleByDistance: this.pixelOffsetScaleByDistance,
+        distanceDisplayCondition: this.distanceDisplayCondition ? 
+            new Cesium.DistanceDisplayCondition(this.distanceDisplayCondition.near, this.distanceDisplayCondition.far) : undefined,
+        scaleByDistance: this.scaleByDistance ? new Cesium.NearFarScalar(
+            this.scaleByDistance.near, 
+            this.scaleByDistance.nearValue, 
+            this.scaleByDistance.far, 
+            this.scaleByDistance.farValue
+        ) : undefined,
+        translucencyByDistance: this.translucencyByDistance ? new Cesium.NearFarScalar(
+            this.translucencyByDistance.near, 
+            this.translucencyByDistance.nearValue, 
+            this.translucencyByDistance.far, 
+            this.translucencyByDistance.farValue
+        ) : undefined,
+        pixelOffsetScaleByDistance: this.pixelOffsetScaleByDistance ? new Cesium.NearFarScalar(
+            this.pixelOffsetScaleByDistance.near, 
+            this.pixelOffsetScaleByDistance.nearValue, 
+            this.pixelOffsetScaleByDistance.far, 
+            this.pixelOffsetScaleByDistance.farValue
+        ) : undefined,
         disableDepthTestDistance: this.disableDepthTestDistance
     });
 
@@ -87,9 +107,9 @@ export class LabelEntity extends GeometryEntity {
   // add() is handled by BaseEntity which iterates collection and calls _mount()
   // _mount() calls _enableHeightCheck() so we don't need to override add() here anymore.
   
-  destroy() {
+  delete() {
       this._disableHeightCheck();
-      super.destroy();
+      super.delete();
   }
 
   // --- Style Setters ---
@@ -99,6 +119,7 @@ export class LabelEntity extends GeometryEntity {
     if (this.entity && this.entity.label) {
       this.entity.label.text = text;
     }
+    this.trigger('change', this);
     return this;
   }
 
@@ -107,6 +128,7 @@ export class LabelEntity extends GeometryEntity {
     if (this.entity && this.entity.label) {
       this.entity.label.font = font;
     }
+    this.trigger('change', this);
     return this;
   }
 
@@ -127,6 +149,7 @@ export class LabelEntity extends GeometryEntity {
     if (this.entity && this.entity.label) {
       this.entity.label.fillColor = this.cesium.Color.fromCssColorString(color);
     }
+    this.trigger('change', this);
     return this;
   }
 
@@ -138,131 +161,71 @@ export class LabelEntity extends GeometryEntity {
   setOutlineColor(color) {
     this.outlineColor = color;
     if (this.entity && this.entity.label) {
-        this.entity.label.outlineColor = this.cesium.Color.fromCssColorString(color);
+      this.entity.label.outlineColor = this.cesium.Color.fromCssColorString(color);
     }
+    this.trigger('change', this);
     return this;
   }
 
   setOutlineWidth(width) {
-    this.outlineWidth = width;
+    const val = parseFloat(width);
+    this.outlineWidth = isNaN(val) ? 1.0 : val;
     if (this.entity && this.entity.label) {
-        this.entity.label.outlineWidth = width;
+      this.entity.label.outlineWidth = this.outlineWidth;
     }
+    this.trigger('change', this);
+    return this;
+  }
+
+  setShowBackground(show) {
+    this.showBackground = !!show;
+    if (this.entity && this.entity.label) {
+      this.entity.label.showBackground = this.showBackground;
+    }
+    this.trigger('change', this);
     return this;
   }
 
   setBackgroundColor(color) {
     this.backgroundColor = color;
+    // If color is provided, we default showBackground to true, 
+    // unless user explicitly sets it to false later (but here we couple it for convenience)
+    // However, to allow independent control, we should only set it to true if it was false?
+    // Standard behavior: setting color implies you want to see it.
     this.showBackground = !!color;
     if (this.entity && this.entity.label) {
-      if (color) {
-        this.entity.label.showBackground = true;
-        this.entity.label.backgroundColor = this.cesium.Color.fromCssColorString(color);
-      } else {
-        this.entity.label.showBackground = false;
-      }
+        if (color) {
+            this.entity.label.showBackground = true;
+            this.entity.label.backgroundColor = this.cesium.Color.fromCssColorString(color);
+        } else {
+            this.entity.label.showBackground = false;
+        }
     }
-    return this;
-  }
-
-  setScale(scale) {
-    this.scale = scale;
-    if (this.entity && this.entity.label) {
-      this.entity.label.scale = scale;
-    }
-    return this;
-  }
-  
-  setPixelOffset(x, y) {
-    this.pixelOffset = [x, y];
-    if (this.entity && this.entity.label) {
-        this.entity.label.pixelOffset = new this.cesium.Cartesian2(x, y);
-    }
-    return this;
-  }
-
-  setEyeOffset(x, y, z) {
-    this.eyeOffset = [x, y, z];
-    if (this.entity && this.entity.label) {
-        this.entity.label.eyeOffset = new this.cesium.Cartesian3(x, y, z);
-    }
-    return this;
-  }
-  
-  setDisableDepthTestDistance(distance) {
-    if (distance === true) {
-        this.disableDepthTestDistance = Number.POSITIVE_INFINITY;
-    } else if (distance === false) {
-        this.disableDepthTestDistance = undefined;
-    } else {
-        this.disableDepthTestDistance = distance;
-    }
-
-    if (this.entity && this.entity.label) {
-        this.entity.label.disableDepthTestDistance = this.disableDepthTestDistance;
-    }
+    this.trigger('change', this);
     return this;
   }
 
   setStyle(style) {
     this.style = style;
-    if (this.entity && this.entity.label) {
-        this.entity.label.style = this.cesium.LabelStyle[style] || this.cesium.LabelStyle.FILL;
+    if (this.entity && this.entity.label && this.cesium && this.cesium.LabelStyle) {
+        const styleEnum = this.cesium.LabelStyle[style];
+        this.entity.label.style = styleEnum !== undefined ? styleEnum : this.cesium.LabelStyle.FILL;
     }
-    return this;
-  }
-
-  setHorizontalOrigin(origin) {
-    this.horizontalOrigin = origin;
-    if (this.entity && this.entity.label) {
-      this.entity.label.horizontalOrigin = this._getHorizontalOrigin(origin);
-    }
-    return this;
-  }
-
-  setVerticalOrigin(origin) {
-    this.verticalOrigin = origin;
-    if (this.entity && this.entity.label) {
-      this.entity.label.verticalOrigin = this._getVerticalOrigin(origin);
-    }
-    return this;
-  }
-
-  setDistanceDisplayCondition(near, far) {
-    this.distanceDisplayCondition = { near, far };
-    if (this.entity && this.entity.label) {
-        this.entity.label.distanceDisplayCondition = new this.cesium.DistanceDisplayCondition(near, far);
-    }
-    return this;
-  }
-
-  setScaleByDistance(near, nearValue, far, farValue) {
-    this.scaleByDistance = { near, nearValue, far, farValue };
-    if (this.entity && this.entity.label) {
-        this.entity.label.scaleByDistance = new this.cesium.NearFarScalar(near, nearValue, far, farValue);
-    }
-    return this;
-  }
-
-  setTranslucencyByDistance(near, nearValue, far, farValue) {
-    this.translucencyByDistance = { near, nearValue, far, farValue };
-    if (this.entity && this.entity.label) {
-        this.entity.label.translucencyByDistance = new this.cesium.NearFarScalar(near, nearValue, far, farValue);
-    }
-    return this;
-  }
-
-  setPixelOffsetScaleByDistance(near, nearValue, far, farValue) {
-    this.pixelOffsetScaleByDistance = { near, nearValue, far, farValue };
-    if (this.entity && this.entity.label) {
-        this.entity.label.pixelOffsetScaleByDistance = new this.cesium.NearFarScalar(near, nearValue, far, farValue);
-    }
+    this.trigger('change', this);
     return this;
   }
 
   // --- Height Display Logic ---
 
   setDisplayHeightRange(min, max) {
+    if (Array.isArray(min)) {
+        max = min[1];
+        min = min[0];
+    } else if (typeof min === 'object' && min !== null) {
+        max = min.max;
+        min = min.min;
+    }
+
     this.minDisplayHeight = min !== undefined ? min : 0;
     this.maxDisplayHeight = max !== undefined ? max : Infinity;
     this._enableHeightCheck();
@@ -321,30 +284,64 @@ export class LabelEntity extends GeometryEntity {
       font: this.font,
       fontSize: this.fontSize,
       bold: this.bold,
+      style: this.style,
       color: this.color,
+      outlineColor: this.outlineColor,
+      outlineWidth: this.outlineWidth,
       backgroundColor: this.backgroundColor,
-      scale: this.scale,
-      pixelOffset: this.pixelOffset,
-      eyeOffset: this.eyeOffset,
+      showBackground: this.showBackground,
+      scale: this.scale !== undefined ? this.scale : 1.0,
+      pixelOffset: this.pixelOffset ? [...this.pixelOffset] : [0,0],
+      eyeOffset: this.eyeOffset ? [...this.eyeOffset] : [0,0,0],
+      horizontalOrigin: this.horizontalOrigin,
+      verticalOrigin: this.verticalOrigin,
+      heightReference: this.heightReference,
+      heightOffset: this.heightOffset,
+      distanceDisplayCondition: this.distanceDisplayCondition ? {...this.distanceDisplayCondition} : undefined,
+      scaleByDistance: this.scaleByDistance ? {...this.scaleByDistance} : undefined,
+      translucencyByDistance: this.translucencyByDistance ? {...this.translucencyByDistance} : undefined,
+      pixelOffsetScaleByDistance: this.pixelOffsetScaleByDistance ? {...this.pixelOffsetScaleByDistance} : undefined,
+      disableDepthTestDistance: this.disableDepthTestDistance,
       minDisplayHeight: this.minDisplayHeight,
       maxDisplayHeight: this.maxDisplayHeight
     };
     return this;
   }
 
-  restoreState() {
+  restoreState(duration = 0) {
     if (this._savedState) {
       const s = this._savedState;
-      this.setText(s.text);
-      this.setFont(s.font); // This might conflict with fontSize/bold setters if called out of order, but fine for now
-      this.fontSize = s.fontSize;
-      this.bold = s.bold;
-      this.setColor(s.color);
-      this.setBackgroundColor(s.backgroundColor);
-      this.setScale(s.scale);
-      this.setPixelOffset(s.pixelOffset[0], s.pixelOffset[1]);
-      this.setEyeOffset(s.eyeOffset[0], s.eyeOffset[1], s.eyeOffset[2]);
-      this.setDisplayHeightRange(s.minDisplayHeight, s.maxDisplayHeight);
+      const options = {
+          text: s.text,
+          font: s.font,
+          fontSize: s.fontSize,
+          bold: s.bold,
+          style: s.style,
+          color: s.color,
+          outlineColor: s.outlineColor,
+          outlineWidth: s.outlineWidth,
+          backgroundColor: s.backgroundColor,
+          showBackground: s.showBackground,
+          
+          scale: s.scale,
+          pixelOffset: s.pixelOffset,
+          eyeOffset: s.eyeOffset,
+          horizontalOrigin: s.horizontalOrigin,
+          verticalOrigin: s.verticalOrigin,
+          
+          heightReference: s.heightReference,
+          height: s.heightOffset,
+          
+          distanceDisplayCondition: s.distanceDisplayCondition || null,
+          scaleByDistance: s.scaleByDistance || null,
+          translucencyByDistance: s.translucencyByDistance || null,
+          pixelOffsetScaleByDistance: s.pixelOffsetScaleByDistance || null,
+          disableDepthTestDistance: s.disableDepthTestDistance,
+          
+          displayHeightRange: [s.minDisplayHeight, s.maxDisplayHeight]
+      };
+      
+      this.update(options, duration);
       this._savedState = null;
     }
     return this;

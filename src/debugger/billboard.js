@@ -79,6 +79,25 @@ export function renderBillboardDebugger(container, billboard, lang = 'zh') {
     return grid;
   };
 
+  // --- Section Helper ---
+  const createSection = (title) => {
+    const section = document.createElement('div');
+    section.style.marginBottom = '12px';
+    section.style.borderTop = '1px solid rgba(255,255,255,0.1)';
+    section.style.paddingTop = '8px';
+    
+    const header = document.createElement('div');
+    header.textContent = title;
+    header.style.fontSize = '12px';
+    header.style.fontWeight = '600';
+    header.style.color = '#94a3b8';
+    header.style.marginBottom = '8px';
+    header.style.paddingLeft = '4px';
+    
+    section.appendChild(header);
+    return section;
+  };
+
   // Info Box
   const infoBox = document.createElement('div');
   infoBox.style.cssText = `
@@ -204,6 +223,10 @@ export function renderBillboardDebugger(container, billboard, lang = 'zh') {
 
   container.appendChild(infoBox);
 
+  // --- Position & Geometry Section ---
+  const posSection = createSection(t('posAndGeo', lang));
+  container.appendChild(posSection);
+
   // Height Control (Altitude)
   const heightRow = tuneRow(createControlRow(t('height', lang), labelWidth));
   const heightContainer = document.createElement('div');
@@ -249,7 +272,11 @@ export function renderBillboardDebugger(container, billboard, lang = 'zh') {
 
   heightContainer.appendChild(heightInput);
   heightRow.appendChild(heightContainer);
-  container.appendChild(heightRow);
+  posSection.appendChild(heightRow);
+
+  // --- Style Section ---
+  const styleSection = createSection(t('style', lang));
+  container.appendChild(styleSection);
 
   // Image
   const imageRow = tuneRow(createControlRow(t('image', lang), labelWidth));
@@ -268,7 +295,7 @@ export function renderBillboardDebugger(container, billboard, lang = 'zh') {
 
   imageContainer.appendChild(imageInput);
   imageRow.appendChild(imageContainer);
-  container.appendChild(imageRow);
+  styleSection.appendChild(imageRow);
 
   // Dimensions (Width/Height)
   const dimRow = tuneRow(createControlRow(`${t('width', lang)} / ${t('height', lang)}`, labelWidth));
@@ -301,7 +328,7 @@ export function renderBillboardDebugger(container, billboard, lang = 'zh') {
   dimContainer.appendChild(wInput);
   dimContainer.appendChild(hInput);
   dimRow.appendChild(dimContainer);
-  container.appendChild(dimRow);
+  styleSection.appendChild(dimRow);
 
   // Size In Meters
   const metersRow = tuneRow(createControlRow(t('sizeInMeters', lang), labelWidth));
@@ -314,7 +341,7 @@ export function renderBillboardDebugger(container, billboard, lang = 'zh') {
       billboard.setSizeInMeters(e.target.checked);
   });
   metersRow.appendChild(metersCheck);
-  container.appendChild(metersRow);
+  styleSection.appendChild(metersRow);
 
   // Scale
   const scaleRow = tuneRow(createControlRow(t('scale', lang), labelWidth));
@@ -333,7 +360,7 @@ export function renderBillboardDebugger(container, billboard, lang = 'zh') {
     }
   });
   scaleRow.appendChild(scaleInput);
-  container.appendChild(scaleRow);
+  styleSection.appendChild(scaleRow);
 
   // Rotation
   const rotationRow = tuneRow(createControlRow(t('rotation', lang), labelWidth));
@@ -351,7 +378,7 @@ export function renderBillboardDebugger(container, billboard, lang = 'zh') {
     }
   });
   rotationRow.appendChild(rotationInput);
-  container.appendChild(rotationRow);
+  styleSection.appendChild(rotationRow);
 
   // Origins
   const originRow = tuneRow(createControlRow(`${t('horizontalOrigin', lang)} / ${t('verticalOrigin', lang)}`, labelWidth));
@@ -384,7 +411,7 @@ export function renderBillboardDebugger(container, billboard, lang = 'zh') {
   originContainer.appendChild(hOriginSel);
   originContainer.appendChild(vOriginSel);
   originRow.appendChild(originContainer);
-  container.appendChild(originRow);
+  styleSection.appendChild(originRow);
 
   // Color
   const colorRow = tuneRow(createControlRow(t('color', lang), labelWidth));
@@ -402,7 +429,7 @@ export function renderBillboardDebugger(container, billboard, lang = 'zh') {
     billboard.setColor(e.target.value);
   });
   colorRow.appendChild(colorInput);
-  container.appendChild(colorRow);
+  styleSection.appendChild(colorRow);
 
   // Opacity
   const opacityRow = tuneRow(createControlRow(t('opacity', lang), labelWidth));
@@ -420,7 +447,7 @@ export function renderBillboardDebugger(container, billboard, lang = 'zh') {
     billboard.setOpacity(val);
   });
   opacityRow.appendChild(opacityInput);
-  container.appendChild(opacityRow);
+  styleSection.appendChild(opacityRow);
 
   // Pixel Offset
   const pixelOffsetRow = tuneRow(createControlRow(t('pixelOffset', lang), labelWidth));
@@ -451,7 +478,7 @@ export function renderBillboardDebugger(container, billboard, lang = 'zh') {
   pixelOffsetContainer.appendChild(pxInput);
   pixelOffsetContainer.appendChild(pyInput);
   pixelOffsetRow.appendChild(pixelOffsetContainer);
-  container.appendChild(pixelOffsetRow);
+  styleSection.appendChild(pixelOffsetRow);
 
   // Eye Offset
   const eyeOffsetRow = tuneRow(createControlRow(t('eyeOffset', lang), labelWidth));
@@ -492,7 +519,11 @@ export function renderBillboardDebugger(container, billboard, lang = 'zh') {
   eyeOffsetContainer.appendChild(eyInput);
   eyeOffsetContainer.appendChild(ezInput);
   eyeOffsetRow.appendChild(eyeOffsetContainer);
-  container.appendChild(eyeOffsetRow);
+  styleSection.appendChild(eyeOffsetRow);
+
+  // --- Display Control Section ---
+  const displaySection = createSection(t('displayControl', lang));
+  container.appendChild(displaySection);
 
   // Distance Display
   const distanceRow = tuneRow(createControlRow(t('distanceDisplay', lang), labelWidth));
@@ -517,7 +548,7 @@ export function renderBillboardDebugger(container, billboard, lang = 'zh') {
   const updateDistance = () => {
     const n = parseFloat(nearInput.value) || 0;
     const f = parseFloat(farInput.value);
-    billboard.setDistanceDisplayCondition(n, isNaN(f) ? undefined : f);
+    billboard.setDistanceDisplayCondition({ near: n, far: isNaN(f) ? undefined : f });
   };
   nearInput.addEventListener('input', updateDistance);
   farInput.addEventListener('input', updateDistance);
@@ -525,7 +556,40 @@ export function renderBillboardDebugger(container, billboard, lang = 'zh') {
   distanceContainer.appendChild(nearInput);
   distanceContainer.appendChild(farInput);
   distanceRow.appendChild(distanceContainer);
-  container.appendChild(distanceRow);
+  displaySection.appendChild(distanceRow);
+
+  // Display Height
+  const displayHeightRow = tuneRow(createControlRow(t('displayHeight', lang), labelWidth));
+  const displayHeightContainer = document.createElement('div');
+  tuneControl(displayHeightContainer);
+  displayHeightContainer.style.gap = '6px';
+
+  const minHeightInput = document.createElement('input');
+  minHeightInput.type = 'number';
+  minHeightInput.placeholder = t('min', lang);
+  minHeightInput.value = billboard.minDisplayHeight || 0;
+  tuneNumberInput(minHeightInput, '110px');
+  styleInput(minHeightInput);
+
+  const maxHeightInput = document.createElement('input');
+  maxHeightInput.type = 'number';
+  maxHeightInput.placeholder = t('max', lang);
+  maxHeightInput.value = Number.isFinite(billboard.maxDisplayHeight) ? billboard.maxDisplayHeight : '';
+  tuneNumberInput(maxHeightInput, '110px');
+  styleInput(maxHeightInput);
+
+  const updateDisplayHeight = () => {
+    const minVal = parseFloat(minHeightInput.value);
+    const maxVal = parseFloat(maxHeightInput.value);
+    billboard.setDisplayCondition({ min: isNaN(minVal) ? 0 : minVal, max: isNaN(maxVal) ? 0 : maxVal });
+  };
+  minHeightInput.addEventListener('input', updateDisplayHeight);
+  maxHeightInput.addEventListener('input', updateDisplayHeight);
+
+  displayHeightContainer.appendChild(minHeightInput);
+  displayHeightContainer.appendChild(maxHeightInput);
+  displayHeightRow.appendChild(displayHeightContainer);
+  displaySection.appendChild(displayHeightRow);
 
   // Scale By Distance
   const scaleDistRow = tuneRow(createControlRow(t('scaleByDistance', lang), labelWidth));
@@ -564,9 +628,13 @@ export function renderBillboardDebugger(container, billboard, lang = 'zh') {
     const nv = parseFloat(snvInput.value);
     const f = parseFloat(sfInput.value);
     const fv = parseFloat(sfvInput.value);
-    if (!isNaN(n) && !isNaN(nv) && !isNaN(f) && !isNaN(fv)) {
-        billboard.setScaleByDistance(n, nv, f, fv);
-    }
+
+    billboard.setScaleByDistance({ 
+        near: isNaN(n) ? undefined : n, 
+        nearValue: isNaN(nv) ? undefined : nv, 
+        far: isNaN(f) ? undefined : f, 
+        farValue: isNaN(fv) ? undefined : fv 
+    });
   };
   snInput.addEventListener('input', updateScaleByDist);
   snvInput.addEventListener('input', updateScaleByDist);
@@ -578,7 +646,7 @@ export function renderBillboardDebugger(container, billboard, lang = 'zh') {
   scaleDistContainer.appendChild(sfInput);
   scaleDistContainer.appendChild(sfvInput);
   scaleDistRow.appendChild(scaleDistContainer);
-  container.appendChild(scaleDistRow);
+  displaySection.appendChild(scaleDistRow);
 
   // Translucency By Distance
   const transDistRow = tuneRow(createControlRow(t('translucencyByDistance', lang), labelWidth));
@@ -617,9 +685,13 @@ export function renderBillboardDebugger(container, billboard, lang = 'zh') {
     const nv = parseFloat(tnvInput.value);
     const f = parseFloat(tfInput.value);
     const fv = parseFloat(tfvInput.value);
-    if (!isNaN(n) && !isNaN(nv) && !isNaN(f) && !isNaN(fv)) {
-        billboard.setTranslucencyByDistance(n, nv, f, fv);
-    }
+    
+    billboard.setTranslucencyByDistance({ 
+        near: isNaN(n) ? undefined : n, 
+        nearValue: isNaN(nv) ? undefined : nv, 
+        far: isNaN(f) ? undefined : f, 
+        farValue: isNaN(fv) ? undefined : fv 
+    });
   };
   tnInput.addEventListener('input', updateTransByDist);
   tnvInput.addEventListener('input', updateTransByDist);
@@ -631,7 +703,7 @@ export function renderBillboardDebugger(container, billboard, lang = 'zh') {
   transDistContainer.appendChild(tfInput);
   transDistContainer.appendChild(tfvInput);
   transDistRow.appendChild(transDistContainer);
-  container.appendChild(transDistRow);
+  displaySection.appendChild(transDistRow);
 
   // Pixel Offset Scale By Distance
   const posDistRow = tuneRow(createControlRow(t('pixelOffsetScaleByDistance', lang), labelWidth));
@@ -670,9 +742,13 @@ export function renderBillboardDebugger(container, billboard, lang = 'zh') {
     const nv = parseFloat(posnvInput.value);
     const f = parseFloat(posfInput.value);
     const fv = parseFloat(posfvInput.value);
-    if (!isNaN(n) && !isNaN(nv) && !isNaN(f) && !isNaN(fv)) {
-        billboard.setPixelOffsetScaleByDistance(n, nv, f, fv);
-    }
+    
+    billboard.setPixelOffsetScaleByDistance({ 
+        near: isNaN(n) ? undefined : n, 
+        nearValue: isNaN(nv) ? undefined : nv, 
+        far: isNaN(f) ? undefined : f, 
+        farValue: isNaN(fv) ? undefined : fv 
+    });
   };
   posnInput.addEventListener('input', updatePosDist);
   posnvInput.addEventListener('input', updatePosDist);
@@ -684,7 +760,16 @@ export function renderBillboardDebugger(container, billboard, lang = 'zh') {
   posDistContainer.appendChild(posfInput);
   posDistContainer.appendChild(posfvInput);
   posDistRow.appendChild(posDistContainer);
-  container.appendChild(posDistRow);
+  displaySection.appendChild(posDistRow);
+
+  const posHint = document.createElement('div');
+  posHint.style.fontSize = '10px';
+  posHint.style.color = '#9ca3af';
+  posHint.style.textAlign = 'right';
+  posHint.style.marginTop = '-4px';
+  posHint.style.marginBottom = '8px';
+  posHint.textContent = lang === 'zh' ? '* 需设置像素偏移(Pixel Offset)才生效' : '* Requires Pixel Offset to be set';
+  displaySection.appendChild(posHint);
 
   // Disable Depth Test Distance
   const depthTestRow = tuneRow(createControlRow(t('depthTest', lang), labelWidth));
@@ -709,40 +794,71 @@ export function renderBillboardDebugger(container, billboard, lang = 'zh') {
   depthTestContainer.appendChild(depthTestCheck);
   depthTestContainer.appendChild(depthTestLabel);
   depthTestRow.appendChild(depthTestContainer);
-  container.appendChild(depthTestRow);
+  displaySection.appendChild(depthTestRow);
 
-  // Display Height
-  const displayHeightRow = tuneRow(createControlRow(t('displayHeight', lang), labelWidth));
-  const displayHeightContainer = document.createElement('div');
-  tuneControl(displayHeightContainer);
-  displayHeightContainer.style.gap = '6px';
+  // Save & Restore
+  const actionRow = document.createElement('div');
+  actionRow.style.display = 'flex';
+  actionRow.style.justifyContent = 'flex-end';
+  actionRow.style.gap = '10px';
+  actionRow.style.marginTop = '16px';
+  actionRow.style.paddingTop = '12px';
+  actionRow.style.borderTop = '1px solid rgba(255,255,255,0.1)';
 
-  const minHeightInput = document.createElement('input');
-  minHeightInput.type = 'number';
-  minHeightInput.placeholder = t('min', lang);
-  minHeightInput.value = billboard.minDisplayHeight || 0;
-  tuneNumberInput(minHeightInput, '110px');
-  styleInput(minHeightInput);
+  const saveBtn = createButton(t('saveState', lang), () => {
+    billboard.saveState();
+    const originalText = saveBtn.textContent;
+    saveBtn.textContent = 'OK!';
+    saveBtn.style.background = '#10b981';
+    setTimeout(() => {
+      saveBtn.textContent = originalText;
+      saveBtn.style.background = '#3b82f6';
+    }, 1500);
+  });
+  
+  const restoreBtn = createButton(t('restoreState', lang), () => {
+    billboard.restoreState();
+    
+    // Refresh inputs
+    clampCheck.checked = billboard.heightReference === 'clampToGround';
+    heightInput.value = billboard.heightOffset || 0;
+    imageInput.value = billboard.imageUrl || billboard.image || '';
+    wInput.value = billboard.width || '';
+    hInput.value = billboard.height || '';
+    metersCheck.checked = !!billboard.sizeInMeters;
+    scaleInput.value = billboard.scale || 1.0;
+    rotationInput.value = billboard.rotation || 0;
+    hOriginSel.value = billboard.horizontalOrigin;
+    vOriginSel.value = billboard.verticalOrigin;
+    colorInput.value = colorToHex(billboard.color);
+    opacityInput.value = billboard.opacity != null ? billboard.opacity : 1;
+    pxInput.value = billboard.pixelOffset ? billboard.pixelOffset[0] : 0;
+    pyInput.value = billboard.pixelOffset ? billboard.pixelOffset[1] : 0;
+    exInput.value = billboard.eyeOffset ? billboard.eyeOffset[0] : 0;
+    eyInput.value = billboard.eyeOffset ? billboard.eyeOffset[1] : 0;
+    ezInput.value = billboard.eyeOffset ? billboard.eyeOffset[2] : 0;
+    nearInput.value = billboard.distanceDisplayCondition ? billboard.distanceDisplayCondition.near : 0;
+    farInput.value = billboard.distanceDisplayCondition ? billboard.distanceDisplayCondition.far : '';
+    minHeightInput.value = billboard.minDisplayHeight || 0;
+    maxHeightInput.value = Number.isFinite(billboard.maxDisplayHeight) ? billboard.maxDisplayHeight : '';
+    snInput.value = billboard.scaleByDistance ? billboard.scaleByDistance.near : '';
+    snvInput.value = billboard.scaleByDistance ? billboard.scaleByDistance.nearValue : '';
+    sfInput.value = billboard.scaleByDistance ? billboard.scaleByDistance.far : '';
+    sfvInput.value = billboard.scaleByDistance ? billboard.scaleByDistance.farValue : '';
+    tnInput.value = billboard.translucencyByDistance ? billboard.translucencyByDistance.near : '';
+    tnvInput.value = billboard.translucencyByDistance ? billboard.translucencyByDistance.nearValue : '';
+    tfInput.value = billboard.translucencyByDistance ? billboard.translucencyByDistance.far : '';
+    tfvInput.value = billboard.translucencyByDistance ? billboard.translucencyByDistance.farValue : '';
+    posnInput.value = billboard.pixelOffsetScaleByDistance ? billboard.pixelOffsetScaleByDistance.near : '';
+    posnvInput.value = billboard.pixelOffsetScaleByDistance ? billboard.pixelOffsetScaleByDistance.nearValue : '';
+    posfInput.value = billboard.pixelOffsetScaleByDistance ? billboard.pixelOffsetScaleByDistance.far : '';
+    posfvInput.value = billboard.pixelOffsetScaleByDistance ? billboard.pixelOffsetScaleByDistance.farValue : '';
+    depthTestCheck.checked = billboard.disableDepthTestDistance === Number.POSITIVE_INFINITY;
+  }, 'secondary');
 
-  const maxHeightInput = document.createElement('input');
-  maxHeightInput.type = 'number';
-  maxHeightInput.placeholder = t('max', lang);
-  maxHeightInput.value = Number.isFinite(billboard.maxDisplayHeight) ? billboard.maxDisplayHeight : '';
-  tuneNumberInput(maxHeightInput, '110px');
-  styleInput(maxHeightInput);
-
-  const updateDisplayHeight = () => {
-    const minVal = parseFloat(minHeightInput.value);
-    const maxVal = parseFloat(maxHeightInput.value);
-    billboard.setDisplayCondition(isNaN(minVal) ? 0 : minVal, isNaN(maxVal) ? 0 : maxVal);
-  };
-  minHeightInput.addEventListener('input', updateDisplayHeight);
-  maxHeightInput.addEventListener('input', updateDisplayHeight);
-
-  displayHeightContainer.appendChild(minHeightInput);
-  displayHeightContainer.appendChild(maxHeightInput);
-  displayHeightRow.appendChild(displayHeightContainer);
-  container.appendChild(displayHeightRow);
+  actionRow.appendChild(saveBtn);
+  actionRow.appendChild(restoreBtn);
+  container.appendChild(actionRow);
 
   // Copy Config Buttons
   const btnRow = document.createElement('div');

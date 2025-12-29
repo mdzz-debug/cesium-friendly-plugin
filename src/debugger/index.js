@@ -93,7 +93,7 @@ class Debugger {
       position: absolute;
       top: 20px;
       right: 20px;
-      width: 420px;
+      width: 500px;
       height: 90vh;
       background: rgba(15, 23, 42, 0.85);
       color: #e2e8f0;

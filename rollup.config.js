@@ -32,7 +32,10 @@ export default [
         browser: true
       }),
       commonjs(),
-      shouldMinify ? terser() : null
+      shouldMinify ? terser({
+        keep_classnames: true,
+        keep_fnames: true
+      }) : null
     ].filter(Boolean),
     external: ['cesium']
   },
@@ -56,7 +59,10 @@ export default [
         browser: true
       }),
       commonjs(),
-      shouldMinify ? terser() : null
+      shouldMinify ? terser({
+        keep_classnames: true,
+        keep_fnames: true
+      }) : null
     ].filter(Boolean),
     external: ['cesium']
   }

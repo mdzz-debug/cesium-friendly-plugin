@@ -87,6 +87,7 @@ const translations = {
     opacity: '透明度',
     outline: '轮廓',
     flash: '闪烁(毫秒)',
+    draggable: '拖拽',
     flashDuration: '周期(ms)',
     copyConfig: '复制配置',
     copyNative: '复制原生',
@@ -150,6 +151,8 @@ const translations = {
     farValue: '远值',
     font: '字体',
     style: '样式',
+    posAndGeo: '位置与几何',
+    displayControl: '显示控制',
     center: '居中',
     left: '左',
     right: '右',
@@ -160,7 +163,9 @@ const translations = {
     outline: '轮廓',
     fillAndOutline: '填充和轮廓',
     background: '背景',
-    text: '文本'
+    text: '文本',
+    saveState: '保存状态',
+    restoreState: '恢复状态',
   },
   en: {
     title: 'Debugger',
@@ -202,6 +207,7 @@ const translations = {
     alwaysOnTop: 'Always On Top',
     bgColor: 'Bg',
     displayHeight: 'Visible Ht',
+    draggable: 'Draggable',
     min: 'Min',
     max: 'Max',
     earthControl: 'Earth Control',
@@ -235,6 +241,8 @@ const translations = {
     farValue: 'Far Val',
     font: 'Font',
     style: 'Style',
+    posAndGeo: 'Position & Geometry',
+    displayControl: 'Display Control',
     center: 'Center',
     left: 'Left',
     right: 'Right',
@@ -245,7 +253,9 @@ const translations = {
     outline: 'Outline',
     fillAndOutline: 'Fill & Outline',
     background: 'Background',
-    text: 'Text'
+    text: 'Text',
+    saveState: 'Save State',
+    restoreState: 'Restore State',
   }
 };
 

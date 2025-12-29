@@ -1,13 +1,10 @@
+import pluginInstance from './core/instance.js';
 import pointsManager from './core/manager.js';
 import debuggerManager from './debugger/index.js';
 import flyManager from './earth/fly.js';
 import { createEntityApi } from './entity/index.js';
 
-const pluginInstance = {
-  version: '1.0.0',
-  _cesium: null,
-  _viewer: null
-};
+
 
 pluginInstance.init = function(cesium, viewer, options = {}) {
   this._cesium = cesium;
@@ -30,23 +27,28 @@ pluginInstance.getViewer = function() {
 };
 
 // Initialize Entity API (Exposed immediately for destructuring)
-pluginInstance.entity = createEntityApi(pluginInstance);
+const entityApi = createEntityApi(pluginInstance);
+pluginInstance.entity = entityApi;
+Object.assign(pluginInstance, entityApi);
 
 // Common Entity Management API (Promoted to top-level)
-pluginInstance.get = (id) => pointsManager.getPoint(id);
-pluginInstance.getAll = () => pointsManager.getAllPoints();
-pluginInstance.remove = (idOrPoint) => pointsManager.removePoint(idOrPoint);
-pluginInstance.removeAll = () => pointsManager.removeAllPoints();
-pluginInstance.removeGroup = (groupName) => pointsManager.removeGroup(groupName);
-pluginInstance.showGroup = (groupName) => pointsManager.showGroup(groupName);
-pluginInstance.hideGroup = (groupName) => pointsManager.hideGroup(groupName);
-pluginInstance.updatePosition = (id, position) => pointsManager.updatePointPosition(id, position);
+pluginInstance.get = (id) => pointsManager.getEntity(id);
+// pluginInstance.getAll is now provided by entityApi (returning EntityGroup)
+pluginInstance.remove = (idOrPoint) => pointsManager.removeEntity(idOrPoint);
+pluginInstance.delete = (idOrPoint) => pointsManager.removeEntity(idOrPoint); // Alias for consistency
+pluginInstance.removeAll = () => pointsManager.removeAllEntities();
+
+// Note: Group operations are now handled via EntityGroup chains.
+// e.g. cf.getGroup('myGroup').hide()
+// Old removeGroup/showGroup/hideGroup methods are removed to encourage chaining.
+
+pluginInstance.updatePosition = (id, position) => pointsManager.updateEntityPosition(id, position);
 pluginInstance.select = (idOrPoint) => {
-    const point = typeof idOrPoint === 'string' ? pointsManager.getPoint(idOrPoint) : idOrPoint;
+    const point = typeof idOrPoint === 'string' ? pointsManager.getEntity(idOrPoint) : idOrPoint;
     if (point) pointsManager.select(point);
 };
 pluginInstance.deselect = () => pointsManager.deselect();
-pluginInstance.getSelected = () => pointsManager.getSelectedPoint();
+pluginInstance.getSelected = () => pointsManager.getSelectedEntity();
 
 // Earth / Camera Control API
 pluginInstance.flyTo = (position, orientation, duration) => flyManager.flyTo(position, orientation, duration);

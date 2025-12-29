@@ -215,9 +215,9 @@ class PointsManager {
   }
 
   /**
-   * Get current selected Point
+   * Get current selected Entity
    */
-  getSelectedPoint() {
+  getSelectedEntity() {
     return this._selectedId ? this.points.get(this._selectedId) : null;
   }
 
@@ -280,7 +280,7 @@ class PointsManager {
 
         if (newPos) {
           // 更新管理器中的实体位置
-          this.updatePointPosition(this._draggedPoint.id, newPos);
+          this.updateEntityPosition(this._draggedPoint.id, newPos);
           // 触发 drag 事件
           this._draggedPoint.trigger('drag', this._draggedPoint, newPos);
         }
@@ -349,7 +349,7 @@ class PointsManager {
 
       if (entityId) {
         const point = this.points.get(entityId);
-        if (point && point.draggable) {
+        if (point && point._draggable) {
           this._isMouseDown = true;
           this._dragStartPosition = this.cesium.Cartesian2.clone(click.position);
           this._pendingDragPoint = point;
@@ -426,9 +426,9 @@ class PointsManager {
   }
 
   /**
-   * Get point by ID
+   * Get entity by ID
    */
-  getPoint(id) {
+  getEntity(id) {
     return this.points.get(id);
   }
 
@@ -446,9 +446,9 @@ class PointsManager {
   }
 
   /**
-   * Get all points
+   * Get all entities
    */
-  getAllPoints() {
+  getAllEntities() {
     return Array.from(this.points.values());
   }
 
@@ -467,13 +467,13 @@ class PointsManager {
   }
 
   /**
-   * Check if point exists
+   * Check if entity exists
    */
-  hasPoint(id) {
+  hasEntity(id) {
     return this.points.has(id);
   }
 
-  registerPoint(point, options = {}) {
+  registerEntity(point, options = {}) {
     this.points.set(point.id, point);
     if (point.group) {
       if (!this.groups.has(point.group)) this.groups.set(point.group, new Set());
@@ -489,31 +489,31 @@ class PointsManager {
     const ttlMs = options.ttlMs;
     if (typeof ttlMs === 'number' && ttlMs > 0) {
       const timer = setTimeout(() => {
-        this.removePoint(point.id);
+        this.removeEntity(point.id);
       }, ttlMs);
       this.ttlTimers.set(point.id, timer);
     } else if (typeof expiresAt === 'number') {
       if (expiresAt > Date.now()) {
         const delay = expiresAt - Date.now();
         const timer = setTimeout(() => {
-          this.removePoint(point.id);
+          this.removeEntity(point.id);
         }, delay);
         this.ttlTimers.set(point.id, timer);
       } else {
         // 已过期，立即移除
         console.warn(`Point ${point.id} is expired (expiresAt: ${expiresAt}), removing immediately.`);
-        this.removePoint(point.id);
+        this.removeEntity(point.id);
       }
     }
   }
 
   /**
-   * Remove point by ID or point instance
-   * @param {string|Object} idOrPoint - Point ID or Point instance
+   * Remove entity by ID or entity instance
+   * @param {string|Object} idOrPoint - Entity ID or Entity instance
    * @param {string} [type] - Optional type filter ('point' | 'billboard')
    * @returns {boolean} Success or not
    */
-  removePoint(idOrPoint, type) {
+  removeEntity(idOrPoint, type) {
     let point = null;
     let id = null;
 
@@ -540,7 +540,7 @@ class PointsManager {
       this.viewer.entities.remove(entity);
     }
     if (point) {
-      point.destroy();
+      point.delete();
       this.points.delete(id);
       const t = this.ttlTimers.get(id);
       if (t) {
@@ -558,10 +558,10 @@ class PointsManager {
   }
 
   /**
-   * Remove all points
+   * Remove all entities
    * @param {string} [type] - Optional type filter
    */
-  removeAllPoints(type) {
+  removeAllEntities(type) {
     const toRemove = [];
     this.points.forEach(point => {
       if (!type || point.type === type) {
@@ -570,7 +570,7 @@ class PointsManager {
     });
 
     toRemove.forEach(point => {
-      this.removePoint(point);
+      this.removeEntity(point);
     });
     
     if (!type) {
@@ -579,9 +579,9 @@ class PointsManager {
   }
 
   /**
-   * Update point position
+   * Update entity position
    */
-  updatePointPosition(id, position) {
+  updateEntityPosition(id, position) {
     const point = this.points.get(id);
     if (point && point.entity) {
       point.updatePosition(position);
@@ -605,7 +605,7 @@ class PointsManager {
     }
   }
 
-  findPointsAtPosition(position, epsilon = 1e-5) {
+  findEntitiesAtPosition(position, epsilon = 1e-5) {
     if (!position || position.length < 2) return [];
     const [lng, lat] = position;
     const height = position[2] || 0;
@@ -636,7 +636,7 @@ class PointsManager {
   }
 
   removeDuplicatesAtPosition(position, groupName, excludeIdOrIds) {
-    const found = this.findPointsAtPosition(position);
+    const found = this.findEntitiesAtPosition(position);
     let count = 0;
     const newGroup = groupName || null;
     
@@ -655,7 +655,7 @@ class PointsManager {
       
       const sameGroup = (p.group || null) === newGroup;
       if (sameGroup) {
-        if (this.removePoint(p)) count++;
+        if (this.removeEntity(p)) count++;
       }
     }
     return count;
@@ -688,7 +688,7 @@ class PointsManager {
 
     if (ms && ms > 0) {
       const timer = setTimeout(() => {
-        this.removePoint(id);
+        this.removeEntity(id);
       }, ms);
       this.ttlTimers.set(id, timer);
     }
@@ -698,36 +698,18 @@ class PointsManager {
     const ids = this.groups.get(groupName);
     if (!ids) return 0;
     let count = 0;
-    // Create a copy to iterate because removePoint will modify the Set
+    // Create a copy to iterate because removeEntity will modify the Set
     for (const id of Array.from(ids)) {
       const point = this.points.get(id);
       if (type && point && point.type !== type) continue;
       
-      if (this.removePoint(id)) count++;
+      if (this.removeEntity(id)) count++;
     }
     // Only delete group if empty
     if (this.groups.has(groupName) && this.groups.get(groupName).size === 0) {
       this.groups.delete(groupName);
     }
     return count;
-  }
-
-  showGroup(groupName) {
-    const ids = this.groups.get(groupName);
-    if (!ids) return;
-    for (const id of ids) {
-      const point = this.points.get(id);
-      if (point) point.show();
-    }
-  }
-
-  hideGroup(groupName) {
-    const ids = this.groups.get(groupName);
-    if (!ids) return;
-    for (const id of ids) {
-      const point = this.points.get(id);
-      if (point) point.hide();
-    }
   }
 
   /**
@@ -754,7 +736,7 @@ class PointsManager {
       this.viewer.scene.canvas.style.cursor = 'default';
     }
     
-    this.removeAllPoints();
+    this.removeAllEntities();
     this.viewer = null;
     this.cesium = null;
   }

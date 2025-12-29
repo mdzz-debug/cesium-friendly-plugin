@@ -3,7 +3,7 @@
  * Supports both Vue 2 and Vue 3
  */
 
-import CesiumFriendlyPlugin from './index.js';
+import pluginInstance from './core/instance.js';
 
 /**
  * Detect Vue version
@@ -30,20 +30,22 @@ function getVueVersion(Vue) {
 const VuePlugin = {
   install(Vue, options = {}) {
     const vueVersion = getVueVersion(Vue);
+    const alias = options.alias || '$cf';
     
     // Vue 3
     if (vueVersion === 3) {
-      Vue.config.globalProperties.$cesiumPlugin = CesiumFriendlyPlugin;
-      Vue.provide('cesiumPlugin', CesiumFriendlyPlugin);
+      Vue.config.globalProperties[alias] = pluginInstance;
+      // Also provide for composition API (inject)
+      Vue.provide('cf', pluginInstance);
     } 
     // Vue 2
     else {
-      Vue.prototype.$cesiumPlugin = CesiumFriendlyPlugin;
+      Vue.prototype[alias] = pluginInstance;
     }
 
     // Auto initialize if cesium and viewer are provided
     if (options.cesium && options.viewer) {
-      CesiumFriendlyPlugin.init(options.cesium, options.viewer, options);
+      pluginInstance.init(options.cesium, options.viewer, options);
     }
   }
 };
