@@ -62,7 +62,6 @@ export function createEntityApi(pluginInstance) {
           
           // Legacy support: if first arg is string, ignore it (user cannot set ID)
           if (typeof arg1 === 'string') {
-               console.warn('CesiumFriendlyPlugin: ID is now auto-allocated. The provided ID will be ignored.');
                options = arg2 || {};
           }
           
@@ -149,10 +148,10 @@ export function createEntityApi(pluginInstance) {
     
     // Future types placeholders
     polyline: (arg1, arg2) => {
-        console.warn('PolylineEntity not yet implemented');
+        // console.warn('PolylineEntity not yet implemented');
     },
     polygon: (arg1, arg2) => {
-        console.warn('PolygonEntity not yet implemented');
+        // console.warn('PolygonEntity not yet implemented');
     }
   };
 }

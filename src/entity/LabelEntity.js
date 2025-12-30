@@ -1,43 +1,49 @@
 
 import { GeometryEntity } from './GeometryEntity.js';
+import pointsManager from '../core/manager.js';
 import { getHeightListener } from '../utils/heightListener.js';
 
 export class LabelEntity extends GeometryEntity {
   constructor(id, viewer, cesium, options = {}) {
     super(id, viewer, cesium, options);
+    const opts = this.options;
     this.type = 'label';
     
     // Style props
-    this.text = options.text || '';
-    this.fontSize = options.fontSize || 14;
-    this.bold = !!options.bold;
-    this.font = options.font || `${this.bold ? 'bold ' : ''}${this.fontSize}px sans-serif`;
-    this.style = options.style || 'FILL';
-    this.color = options.color || '#FFFFFF';
-    this.outlineColor = options.outlineColor || '#000000';
-    this.outlineWidth = options.outlineWidth || 1.0;
-    this.backgroundColor = options.backgroundColor || null;
-    this.showBackground = options.showBackground !== undefined ? !!options.showBackground : !!options.backgroundColor;
-    this.scale = options.scale !== undefined ? options.scale : 1.0;
-    this.pixelOffset = options.pixelOffset || [0, 0];
+    this.text = opts.text || '';
+    this.fontSize = opts.fontSize || 14;
+    this.bold = !!opts.bold;
+    this.font = opts.font || `${this.bold ? 'bold ' : ''}${this.fontSize}px sans-serif`;
+    this.style = opts.style || 'FILL';
+    this.color = opts.color || '#FFFFFF';
+    this.outlineColor = opts.outlineColor || '#000000';
+    this.outlineWidth = opts.outlineWidth || 1.0;
+    this.backgroundColor = opts.backgroundColor || null;
+    this.showBackground = opts.showBackground !== undefined ? !!opts.showBackground : !!opts.backgroundColor;
+    this.scale = opts.scale !== undefined ? opts.scale : 1.0;
+    this.pixelOffset = opts.pixelOffset || [0, 0];
     // Default eyeOffset to slightly forward (negative Z) to ensure label is on top
-    this.eyeOffset = options.eyeOffset || [0, 0, -5];
-    this.horizontalOrigin = options.horizontalOrigin || 'CENTER';
-    this.verticalOrigin = options.verticalOrigin || 'CENTER';
+    this.eyeOffset = opts.eyeOffset || [0, 0, -5];
+    this.horizontalOrigin = opts.horizontalOrigin || 'CENTER';
+    this.verticalOrigin = opts.verticalOrigin || 'CENTER';
     
     // Advanced props
-    this.distanceDisplayCondition = options.distanceDisplayCondition || null;
-    this.scaleByDistance = options.scaleByDistance || null;
-    this.translucencyByDistance = options.translucencyByDistance || null;
-    this.pixelOffsetScaleByDistance = options.pixelOffsetScaleByDistance || null;
-    this.disableDepthTestDistance = options.disableDepthTestDistance === false ? undefined : Number.POSITIVE_INFINITY;
+    this.distanceDisplayCondition = opts.distanceDisplayCondition || null;
+    this.scaleByDistance = opts.scaleByDistance || null;
+    this.translucencyByDistance = opts.translucencyByDistance || null;
+    this.pixelOffsetScaleByDistance = opts.pixelOffsetScaleByDistance || null;
+    this.disableDepthTestDistance = opts.disableDepthTestDistance === false ? undefined : Number.POSITIVE_INFINITY;
     
     // Height display logic
-    this.minDisplayHeight = options.minDisplayHeight !== undefined ? options.minDisplayHeight : 0;
-    this.maxDisplayHeight = options.maxDisplayHeight !== undefined ? options.maxDisplayHeight : Infinity;
+    this.minDisplayHeight = opts.minDisplayHeight !== undefined ? opts.minDisplayHeight : 0;
+    this.maxDisplayHeight = opts.maxDisplayHeight !== undefined ? opts.maxDisplayHeight : Infinity;
     
     this._heightListenerUnsubscribe = null;
     this.updateVisibilityByHeight = this.updateVisibilityByHeight.bind(this);
+  }
+
+  getCollection() {
+    return pointsManager.getDataSource('cesium-friendly-labels').entities;
   }
 
   _createEntity() {

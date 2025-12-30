@@ -19,6 +19,31 @@ class PointsManager {
     this._dragOffset = null; // 拖拽偏移量 (Cartesian3)
     this.selectionListeners = new Set();
     this.rightClickListeners = new Set();
+    this._dataSources = new Map(); // Cache for CustomDataSources
+  }
+
+  getDataSource(name) {
+      if (!this.viewer || !this.cesium) return null;
+      
+      // 1. Check local cache first
+      if (this._dataSources.has(name)) {
+          return this._dataSources.get(name);
+      }
+      
+      // 2. Check Viewer (in case created externally or previously)
+      const list = this.viewer.dataSources.getByName(name);
+      if (list.length > 0) {
+          const ds = list[0];
+          this._dataSources.set(name, ds);
+          return ds;
+      }
+      
+      // 3. Create New
+      const ds = new this.cesium.CustomDataSource(name);
+      this.viewer.dataSources.add(ds);
+      this._dataSources.set(name, ds);
+      
+      return ds;
   }
 
   addSelectionListener(callback) {
@@ -473,88 +498,170 @@ class PointsManager {
     return this.points.has(id);
   }
 
+  /**
+   * Register an entity
+   * @param {Object} point - The entity wrapper instance
+   * @param {Object} options - Options
+   */
   registerEntity(point, options = {}) {
+    if (!point || !point.id) return;
+    
+    // Check if ID exists and remove it properly to ensure cleanup logic runs
+    if (this.points.has(point.id)) {
+        const oldPoint = this.points.get(point.id);
+        if (oldPoint && oldPoint !== point) {
+             if (options._reused) {
+                 // Just detach the old wrapper without killing the Cesium entity
+                 // We still need to clear timers associated with the old wrapper ID
+                 if (this.ttlTimers.has(point.id)) {
+                     clearTimeout(this.ttlTimers.get(point.id));
+                     this.ttlTimers.delete(point.id);
+                 }
+                 // Remove from old groups if needed (though group likely same)
+                 // For safety, we just overwrite in the map.
+             } else {
+                 // Force call removeEntity to trigger all cleanup logic (resetting origins, etc.)
+                 this.removeEntity(point.id);
+            }
+        }
+    }
+    
     this.points.set(point.id, point);
+    
     if (point.group) {
       if (!this.groups.has(point.group)) this.groups.set(point.group, new Set());
       this.groups.get(point.group).add(point.id);
     }
-    let expiresAt = options.expiresAt;
     
-    // 自动兼容秒级时间戳（10位）
-    if (typeof expiresAt === 'number' && expiresAt < 10000000000) {
-      expiresAt *= 1000;
-    }
-
-    const ttlMs = options.ttlMs;
-    if (typeof ttlMs === 'number' && ttlMs > 0) {
-      const timer = setTimeout(() => {
-        this.removeEntity(point.id);
-      }, ttlMs);
-      this.ttlTimers.set(point.id, timer);
-    } else if (typeof expiresAt === 'number') {
-      if (expiresAt > Date.now()) {
-        const delay = expiresAt - Date.now();
-        const timer = setTimeout(() => {
-          this.removeEntity(point.id);
-        }, delay);
-        this.ttlTimers.set(point.id, timer);
-      } else {
-        // 已过期，立即移除
-        console.warn(`Point ${point.id} is expired (expiresAt: ${expiresAt}), removing immediately.`);
-        this.removeEntity(point.id);
-      }
+    if (options.ttl) {
+      this.updateTTL(point.id, options.ttl);
     }
   }
 
   /**
    * Remove entity by ID or entity instance
-   * @param {string|Object} idOrPoint - Entity ID or Entity instance
-   * @param {string} [type] - Optional type filter ('point' | 'billboard')
+   * @param {string|Object} idOrEntity - Entity ID or Entity instance
    * @returns {boolean} Success or not
    */
-  removeEntity(idOrPoint, type) {
-    let point = null;
-    let id = null;
-
-    // 支持传入 id（字符串）或 point 对象
-    if (typeof idOrPoint === 'string') {
-      id = idOrPoint;
+  removeEntity(idOrEntity) {
+    let id;
+    let point;
+    
+    // Handle overload: id string or entity object
+    if (typeof idOrEntity === 'string') {
+      id = idOrEntity;
       point = this.points.get(id);
-    } else if (idOrPoint && typeof idOrPoint === 'object' && idOrPoint.id) {
-      // 传入 point 对象，直接使用
-      point = idOrPoint;
+    } else if (typeof idOrEntity === 'object' && idOrEntity.id) {
+      point = idOrEntity;
       id = point.id;
     } else {
       return false;
     }
-
-    // Check type if provided
-    if (type && point && point.type !== type) {
-      return false;
-    }
-
+    
     // 无论是否取到 point 对象，都尝试移除 viewer 中的实体
-    const entity = point?.entity || (id ? this.viewer.entities.getById(id) : null);
-    if (entity) {
-      this.viewer.entities.remove(entity);
+    // Updated logic: Check all possible locations (Viewer.entities + Custom DataSources)
+    let removed = false;
+    
+    // 1. Try remove via point instance if available (it knows its collection)
+    if (point && typeof point.getCollection === 'function') {
+         const collection = point.getCollection();
+         if (collection) {
+             const e = point.entity || collection.getById(id);
+             if (e) {
+                 removed = collection.remove(e);
+             }
+         }
     }
-    if (point) {
-      point.delete();
-      this.points.delete(id);
-      const t = this.ttlTimers.get(id);
-      if (t) {
-        clearTimeout(t);
-        this.ttlTimers.delete(id);
-      }
-      if (point.group && this.groups.has(point.group)) {
-        this.groups.get(point.group).delete(id);
-        if (this.groups.get(point.group).size === 0) this.groups.delete(point.group);
-      }
-      return true;
+
+    // 2. If not removed yet (or no point instance), try global viewer.entities (Legacy/Fallback)
+    if (!removed) {
+        const entity = this.viewer.entities.getById(id);
+        if (entity) {
+            removed = this.viewer.entities.remove(entity);
+        }
     }
-    // 如果没有在管理器中找到 point，但 viewer 中确实移除了实体，也视为成功
-    return !!entity;
+    
+    // 3. If still not removed, scan known CustomDataSources (Brute force cleanup)
+    if (!removed) {
+        const dataSources = ['cesium-friendly-points', 'cesium-friendly-billboards', 'cesium-friendly-labels'];
+            for (const dsName of dataSources) {
+                 const dsList = this.viewer.dataSources.getByName(dsName);
+                 // Check ALL data sources with this name (in case duplicates were created)
+                 for (const ds of dsList) {
+                     const e = ds.entities.getById(id);
+                     if (e) {
+                         const r = ds.entities.remove(e);
+                         if (r) removed = true;
+                     }
+                 }
+            }
+    }
+
+    if (this.points.has(id)) {
+       point = this.points.get(id); // Ensure point is from map
+       
+      //  console.log(`[CesiumFriendly Debug] Removing entity: ${id}`);
+
+       // Stop lifecycle
+       if (this.ttlTimers.has(id)) {
+         clearTimeout(this.ttlTimers.get(id));
+         this.ttlTimers.delete(id);
+       }
+
+       if (point) {
+         // Explicitly cleanup state to prevent pollution
+         
+         // Height
+         if (typeof point.setHeight === 'function') {
+           point.setHeight(0);
+         }
+         if (point.heightReference && point.heightReference !== 'clampToGround') {
+           point.heightReference = 'clampToGround';
+         }
+         
+         // Alignment
+        if (typeof point.setVerticalOrigin === 'function') {
+           point.setVerticalOrigin('CENTER');
+        }
+        if (typeof point.setHorizontalOrigin === 'function') {
+           point.setHorizontalOrigin('CENTER');
+        }
+        
+        // Extra Cleanup for potential pollution
+        if (point.type === 'billboard' || point.type === 'label') {
+            if (point.setPixelOffset) point.setPixelOffset(0, 0);
+            if (point.setEyeOffset) point.setEyeOffset(0, 0, 0);
+        } else if (point.type === 'point') {
+            // Ensure PointEntity is clean
+            if (point.setPixelOffset) point.setPixelOffset(0, 0);
+        }
+
+        // Pixel Offset & Rotation (Ensure complete reset)
+        if (typeof point.setPixelOffset === 'function') {
+           point.setPixelOffset(0, 0);
+        }
+         if (typeof point.setRotation === 'function') {
+            point.setRotation(0);
+         }
+ 
+         // Destroy
+         // Avoid recursive call back to delete() if we are already in a delete context
+         // if (typeof point.delete === 'function') {
+         //   point.delete();
+         // }
+         
+         // Remove from groups
+         if (point.group && this.groups.has(point.group)) {
+             this.groups.get(point.group).delete(id);
+             if (this.groups.get(point.group).size === 0) this.groups.delete(point.group);
+         }
+       }
+
+       this.points.delete(id);
+       return true;
+    }
+    
+    return removed;
   }
 
   /**
@@ -562,6 +669,49 @@ class PointsManager {
    * @param {string} [type] - Optional type filter
    */
   removeAllEntities(type) {
+    // Native Optimization: Clear everything at once if no type filter
+    if (!type) {
+        // console.log('[CesiumFriendly] Removing ALL entities via native removeAll');
+        
+        // 1. Cleanup all wrappers (timers, events) manually to avoid loop overhead
+        this.points.forEach(point => {
+             // Stop lifecycle
+             if (this.ttlTimers.has(point.id)) {
+                 clearTimeout(this.ttlTimers.get(point.id));
+             }
+             
+             // Mark as destroyed so they don't try to remove themselves
+             if (point) {
+                 point._destroyed = true;
+                 point.entity = null;
+                 if (point._eventHandlers) point._eventHandlers.clear();
+             }
+        });
+        
+        // 2. Clear collections
+        this.points.clear();
+        this.groups.clear();
+        this.ttlTimers.clear();
+        
+        // 3. Native Clear (The Core Fix)
+        if (this.viewer) {
+            // Clear default collection
+            if (this.viewer.entities) {
+                this.viewer.entities.removeAll();
+            }
+            
+            // Clear Custom DataSources
+            const dsNames = ['cesium-friendly-points', 'cesium-friendly-billboards', 'cesium-friendly-labels'];
+            dsNames.forEach(name => {
+                const dsList = this.viewer.dataSources.getByName(name);
+                dsList.forEach(ds => {
+                    ds.entities.removeAll();
+                });
+            });
+        }
+        return;
+    }
+
     const toRemove = [];
     this.points.forEach(point => {
       if (!type || point.type === type) {
@@ -572,10 +722,6 @@ class PointsManager {
     toRemove.forEach(point => {
       this.removeEntity(point);
     });
-    
-    if (!type) {
-       // If clearing all, clear timers and groups too (done by removePoint iteratively, but we can clean up leftovers if any)
-    }
   }
 
   /**

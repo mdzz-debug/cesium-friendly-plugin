@@ -1,5 +1,6 @@
 
 import { GeometryEntity } from './GeometryEntity.js';
+import pointsManager from '../core/manager.js';
 
 function resolveImageInput(input) {
   if (input == null) return null;
@@ -17,30 +18,35 @@ function resolveImageInput(input) {
 export class BillboardEntity extends GeometryEntity {
   constructor(id, viewer, cesium, options = {}) {
     super(id, viewer, cesium, options);
+    const opts = this.options;
     this.type = 'billboard';
     
     // Style props
     // Fix: options.image might be the prop name instead of imageUrl
-    this.imageUrl = resolveImageInput(options.imageUrl || options.image) || '';
-    this.color = options.color || '#FFFFFF';
-    this.scale = options.scale != null ? options.scale : 1.0;
-    this.rotation = options.rotation || 0;
-    this.opacity = options.opacity != null ? options.opacity : 1;
+    this.imageUrl = resolveImageInput(opts.imageUrl || opts.image) || '';
+    this.color = opts.color || '#FFFFFF';
+    this.scale = opts.scale != null ? opts.scale : 1.0;
+    this.rotation = opts.rotation || 0;
+    this.opacity = opts.opacity != null ? opts.opacity : 1;
     
     // Advanced props
-    this.width = options.width;
-    this.height = options.height;
-    this.sizeInMeters = options.sizeInMeters;
-    this.pixelOffset = options.pixelOffset || [0, 0];
+    this.width = opts.width;
+    this.height = opts.height;
+    this.sizeInMeters = opts.sizeInMeters;
+    this.pixelOffset = opts.pixelOffset || [0, 0];
     // Default eyeOffset to slightly back (positive Z) to prevent Z-fighting with Point
-    this.eyeOffset = options.eyeOffset || [0, 0, 1]; 
-    this.horizontalOrigin = options.horizontalOrigin || 'CENTER';
-    this.verticalOrigin = options.verticalOrigin || 'CENTER';
-    this.distanceDisplayCondition = options.distanceDisplayCondition;
-    this.scaleByDistance = options.scaleByDistance;
-    this.translucencyByDistance = options.translucencyByDistance;
-    this.pixelOffsetScaleByDistance = options.pixelOffsetScaleByDistance;
-    this.disableDepthTestDistance = options.disableDepthTestDistance === false ? undefined : Number.POSITIVE_INFINITY;
+    this.eyeOffset = opts.eyeOffset || [0, 0, 1]; 
+    this.horizontalOrigin = opts.horizontalOrigin || 'CENTER';
+    this.verticalOrigin = opts.verticalOrigin || 'CENTER';
+    this.distanceDisplayCondition = opts.distanceDisplayCondition;
+    this.scaleByDistance = opts.scaleByDistance;
+    this.translucencyByDistance = opts.translucencyByDistance;
+    this.pixelOffsetScaleByDistance = opts.pixelOffsetScaleByDistance;
+    this.disableDepthTestDistance = opts.disableDepthTestDistance === false ? undefined : Number.POSITIVE_INFINITY;
+  }
+
+  getCollection() {
+    return pointsManager.getDataSource('cesium-friendly-billboards').entities;
   }
 
   _createEntity() {
@@ -60,7 +66,11 @@ export class BillboardEntity extends GeometryEntity {
         width: this.width,
         height: this.height,
         sizeInMeters: this.sizeInMeters,
-        pixelOffset: this.pixelOffset ? new Cesium.Cartesian2(this.pixelOffset[0], this.pixelOffset[1]) : new Cesium.Cartesian2(0, 0),
+        pixelOffset: this.pixelOffset ? (
+            Array.isArray(this.pixelOffset) ? 
+            new Cesium.Cartesian2(this.pixelOffset[0], this.pixelOffset[1]) : 
+            new Cesium.Cartesian2(this.pixelOffset.x, this.pixelOffset.y)
+        ) : new Cesium.Cartesian2(0, 0),
         eyeOffset: this.eyeOffset ? new Cesium.Cartesian3(this.eyeOffset[0], this.eyeOffset[1], this.eyeOffset[2]) : new Cesium.Cartesian3(0, 0, 0),
         horizontalOrigin: this._getHorizontalOrigin(this.horizontalOrigin),
         verticalOrigin: this._getVerticalOrigin(this.verticalOrigin),
@@ -171,6 +181,7 @@ export class BillboardEntity extends GeometryEntity {
   // --- State ---
 
   saveState() {
+    // console.log(`[CesiumFriendly Debug] Saving state for ${this.id} (${this.type}). VO: ${this.verticalOrigin}`);
     this._savedState = {
       scale: this.scale !== undefined ? this.scale : 1.0,
       rotation: this.rotation,

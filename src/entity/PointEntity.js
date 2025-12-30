@@ -1,28 +1,57 @@
 
 import { GeometryEntity } from './GeometryEntity.js';
+import pointsManager from '../core/manager.js';
 
 export class PointEntity extends GeometryEntity {
   constructor(id, viewer, cesium, options = {}) {
-    super(id, viewer, cesium, options);
-    this.type = 'point';
+    // 1. Sanitize options BEFORE passing to super/BaseEntity
+    // This ensures the instance never receives polluted properties from shared config objects
+    const cleanOptions = { ...options };
+    
+    // Remove properties that don't belong to PointEntity or could cause pollution
+    const pollutionKeys = ['verticalOrigin', 'horizontalOrigin', 'width', 'height', 'image', 'text', 'font', 'pixelOffset', 'eyeOffset'];
+    pollutionKeys.forEach(key => {
+        if (cleanOptions[key] !== undefined) {
+            delete cleanOptions[key];
+        }
+    });
+
+    super(id, viewer, cesium, cleanOptions);
+    
+    // Double-check: Force reset these properties on the instance itself
+    // just in case BaseEntity/GeometryEntity logic attached them.
+    this.verticalOrigin = undefined;
+    this.horizontalOrigin = undefined;
+    this.width = undefined;
+    this.height = undefined;
+    this.pixelOffset = undefined;
+    this.eyeOffset = undefined;
+     
+     const opts = this.options; // These are now the deep-cloned clean options
+    //  console.log(`[CesiumFriendly Debug] PointEntity ${id} initialized with clean options:`, JSON.stringify(opts));
+ 
+     this.type = 'point';
     
     // Style props
-    this.color = options.color || '#FF0000';
-    this.pixelSize = options.pixelSize || 10;
-    this.scale = options.scale !== undefined ? options.scale : 1.0;
-    this.opacity = options.opacity != null ? options.opacity : 1;
-    this.outline = options.outline || false;
-    this.outlineColor = options.outlineColor || '#FFFFFF';
-    this.outlineWidth = options.outlineWidth || 2;
+    this.color = opts.color || '#FF0000';
+    this.pixelSize = opts.pixelSize || 10;
+    this.scale = opts.scale !== undefined ? opts.scale : 1.0;
+    this.opacity = opts.opacity != null ? opts.opacity : 1;
+    this.outline = opts.outline || false;
+    this.outlineColor = opts.outlineColor || '#FFFFFF';
+    this.outlineWidth = opts.outlineWidth || 2;
     
     // Advanced props
-    this.pixelOffset = options.pixelOffset; // {x, y}
-    this.eyeOffset = options.eyeOffset; // {x, y, z}
-    this.distanceDisplayCondition = options.distanceDisplayCondition;
-    this.scaleByDistance = options.scaleByDistance;
-    this.translucencyByDistance = options.translucencyByDistance;
-    this.pixelOffsetScaleByDistance = options.pixelOffsetScaleByDistance;
-    this.disableDepthTestDistance = options.disableDepthTestDistance;
+    this.eyeOffset = opts.eyeOffset; // {x, y, z}
+    this.distanceDisplayCondition = opts.distanceDisplayCondition;
+    this.scaleByDistance = opts.scaleByDistance;
+    this.translucencyByDistance = opts.translucencyByDistance;
+    this.pixelOffsetScaleByDistance = opts.pixelOffsetScaleByDistance;
+    this.disableDepthTestDistance = opts.disableDepthTestDistance;
+  }
+
+  getCollection() {
+    return pointsManager.getDataSource('cesium-friendly-points').entities;
   }
 
   _createEntity() {
@@ -57,18 +86,21 @@ export class PointEntity extends GeometryEntity {
         disableDepthTestDistance: this.disableDepthTestDistance
     });
 
-    const entity = new Cesium.Entity({
+    // Return plain configuration object instead of Entity instance
+    // This allows BaseEntity to use viewer.entities.add(options) natively
+    // which avoids pollution issues
+    const entityOptions = {
         id: this.id,
         name: this.name,
         description: this.description,
         position: position,
         point: pointGraphics
-    });
+    };
     
-    // Attach metadata
-    entity._meta = { ...this.options };
-
-    return entity;
+    // Attach metadata (will be lost on native add, but wrapper has it)
+    // entity._meta = { ...this.options };
+    
+    return entityOptions;
   }
   
 
@@ -149,8 +181,7 @@ export class PointEntity extends GeometryEntity {
       outlineWidth: this.outlineWidth,
       heightReference: this.heightReference,
       heightOffset: this.heightOffset,
-      pixelOffset: this.pixelOffset ? (Array.isArray(this.pixelOffset) ? [...this.pixelOffset] : {...this.pixelOffset}) : undefined,
-      eyeOffset: this.eyeOffset ? (Array.isArray(this.eyeOffset) ? [...this.eyeOffset] : {...this.eyeOffset}) : undefined,
+      
       distanceDisplayCondition: this.distanceDisplayCondition ? {...this.distanceDisplayCondition} : undefined,
       scaleByDistance: this.scaleByDistance ? {...this.scaleByDistance} : undefined,
       translucencyByDistance: this.translucencyByDistance ? {...this.translucencyByDistance} : undefined,
@@ -175,8 +206,7 @@ export class PointEntity extends GeometryEntity {
         heightReference: s.heightReference,
         height: s.heightOffset,
         
-        pixelOffset: s.pixelOffset,
-        eyeOffset: s.eyeOffset,
+        // eyeOffset removed
         
         distanceDisplayCondition: s.distanceDisplayCondition || null,
         scaleByDistance: s.scaleByDistance || null,
@@ -189,5 +219,17 @@ export class PointEntity extends GeometryEntity {
       this._savedState = null;
     }
     return this;
+  }
+
+  // --- Unsupported Methods (Override to prevent state pollution) ---
+  setPixelOffset() { return this; }
+  setEyeOffset() { return this; }
+  setHorizontalOrigin() { 
+      // console.log(`[CesiumFriendly Debug] PointEntity ignored setHorizontalOrigin for ${this.id}`);
+      return this; 
+  }
+  setVerticalOrigin() { 
+      // console.log(`[CesiumFriendly Debug] PointEntity ignored setVerticalOrigin for ${this.id}`);
+      return this; 
   }
 }

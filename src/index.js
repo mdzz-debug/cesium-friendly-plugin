@@ -7,10 +7,26 @@ import { createEntityApi } from './entity/index.js';
 
 
 pluginInstance.init = function(cesium, viewer, options = {}) {
+  console.log('%c 🌍 CesiumFriendlyPlugin Initialized ', 'background: #3b82f6; color: white; padding: 2px 5px; border-radius: 2px; font-weight: bold;');
+  console.log('%c 🚀 Ready to fly! ', 'background: #10b981; color: white; padding: 2px 5px; border-radius: 2px; font-weight: bold;');
+
   this._cesium = cesium;
-  this._viewer = viewer;
-  pointsManager.init(cesium, viewer);
-  flyManager.init(cesium, viewer);
+  
+  // Handle Vue Ref or direct object
+  // If user passes a Ref (e.g. from Vue setup), we need to unwrap it
+  let rawViewer = viewer;
+  if (viewer) {
+      if (viewer.entities) {
+          rawViewer = viewer;
+      } else if (viewer.value && viewer.value.entities) {
+          // It's likely a Ref
+          rawViewer = viewer.value;
+      }
+  }
+
+  this._viewer = rawViewer;
+  pointsManager.init(cesium, rawViewer);
+  flyManager.init(cesium, rawViewer);
   
   if (options && options.debug) {
     debuggerManager.init();

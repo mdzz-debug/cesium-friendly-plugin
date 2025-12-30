@@ -36,3 +36,33 @@ cf.getGroup('myGroup').setColor('red');
 - `getCurrentCamera()`: 获取当前相机参数。
 - `setSurfaceOpacity(opacity)`: 设置地表透明度。
 - `setDepthTest(enabled)`: 开启/关闭深度检测。
+
+## 实体组合与导出 (toCanvas)
+
+支持将多个实体（点、图标、文字）组合并渲染为一张 Canvas 图片，常用于高性能聚合或复杂图标生成。此方法为链式调用中的终结操作之一（替代普通的 `add`）。
+
+```javascript
+// 链式组合：点 + 图标 + 文字 -> 图片
+cf.point({ 
+    color: 'red', 
+    pixelSize: 10 
+})
+.billboard({
+    imageUrl: '/icon.png',
+    width: 32,
+    height: 32
+})
+.label({
+    text: '聚合点',
+    font: '16px sans-serif',
+    pixelOffset: [0, 30]
+})
+.toCanvas(2) // 传入倍率因子 (例如 2)，生成 2x 高清图片
+.add(); // 添加到地球 (作为一个合并后的 BillboardEntity)
+```
+
+**说明**:
+- `.toCanvas(scaleFactor)`: 启用 Canvas 渲染模式。
+  - `scaleFactor` (可选): 图片渲染倍率，默认为 1。传入 2 或 3 可生成 Retina 级别的高清图。
+- 在 `toCanvas` 模式下，`.setScale()` 可用于控制显示大小，而 `scaleFactor` 用于控制分辨率（清晰度）。
+- 最终调用 `.add()` 时，会在地球上生成一个单独的 `BillboardEntity`，其图片内容为组合后的 Canvas。

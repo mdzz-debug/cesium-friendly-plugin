@@ -5,12 +5,13 @@ import pointsManager from '../core/manager.js';
 export class GeometryEntity extends BaseEntity {
   constructor(id, viewer, cesium, options = {}) {
     super(id, viewer, cesium, options);
+    const opts = this.options;
     this.type = 'geometry';
     
-    this.position = options.position || [0, 0, 0]; // [lng, lat, alt]
-    this.heightReference = options.heightReference || 'clampToGround';
-    this.heightOffset = options.heightOffset || 0;
-    this._draggable = options.draggable || false;
+    this.position = opts.position || [0, 0, 0]; // [lng, lat, alt]
+    this.heightReference = opts.heightReference || 'clampToGround';
+    this.heightOffset = opts.heightOffset || 0;
+    this._draggable = opts.draggable || false;
   }
 
   // --- Lifecycle ---
@@ -205,6 +206,7 @@ export class GeometryEntity extends BaseEntity {
   }
 
   setHorizontalOrigin(origin) {
+
     this.horizontalOrigin = origin;
     if (this.entity) {
         const val = this._getHorizontalOrigin(origin);
@@ -216,6 +218,7 @@ export class GeometryEntity extends BaseEntity {
   }
 
   setVerticalOrigin(origin) {
+
     this.verticalOrigin = origin;
     if (this.entity) {
         const val = this._getVerticalOrigin(origin);
@@ -294,7 +297,14 @@ export class GeometryEntity extends BaseEntity {
         this.scaleByDistance = undefined;
         if (this.entity) {
             const val = undefined;
-            if (this.entity.billboard) this.entity.billboard.scaleByDistance = val;
+            if (this.entity.billboard) {
+                 this.entity.billboard.scaleByDistance = val;
+                 // If this is a canvas entity, we must also clear pixelOffsetScaleByDistance
+                 // because the offset depends on scale.
+                 if (this._asCanvas) {
+                     this.entity.billboard.pixelOffsetScaleByDistance = val;
+                 }
+            }
             if (this.entity.label) this.entity.label.scaleByDistance = val;
             if (this.entity.point) this.entity.point.scaleByDistance = val;
         }
@@ -305,7 +315,13 @@ export class GeometryEntity extends BaseEntity {
     const res = this._createNearFarScalar(options, this.scaleByDistance);
     this.scaleByDistance = res.obj;
     if (this.entity) {
-        if (this.entity.billboard) this.entity.billboard.scaleByDistance = res.cesiumObj;
+        if (this.entity.billboard) {
+             this.entity.billboard.scaleByDistance = res.cesiumObj;
+             // Sync pixelOffsetScaleByDistance for canvas entities
+             if (this._asCanvas) {
+                 this.entity.billboard.pixelOffsetScaleByDistance = res.cesiumObj;
+             }
+        }
         if (this.entity.label) this.entity.label.scaleByDistance = res.cesiumObj;
         if (this.entity.point) this.entity.point.scaleByDistance = res.cesiumObj;
     }

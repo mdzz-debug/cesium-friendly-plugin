@@ -11,24 +11,50 @@ class FlyManager {
   }
 
   // --- Fly To ---
-  flyTo(position, orientation, duration = 2.0) {
+  flyTo(positionOrEntity, orientation, duration = 2.0) {
     return new Promise((resolve) => {
       if (!this.viewer) {
         resolve();
         return;
       }
+
+      let targetPos = positionOrEntity;
       
+      // Handle Entity Wrapper or Cesium Entity
+      if (positionOrEntity && (positionOrEntity.position || positionOrEntity.id)) {
+          // It might be our wrapper
+          if (typeof positionOrEntity.position === 'object' && !Array.isArray(positionOrEntity.position)) {
+              // Assume it's a wrapper with {lng, lat, alt} position getter/property
+               // But wait, our wrappers usually have position as getter returning array or internal property?
+               // BaseEntity has position setter, but getting it might be tricky.
+               // Let's check if it has .entity.position
+               if (positionOrEntity.entity && positionOrEntity.entity.position) {
+                   // Use Cesium's flyTo for entities
+                   this.viewer.flyTo(positionOrEntity.entity, {
+                       duration: duration,
+                       offset: orientation ? new this.cesium.HeadingPitchRange(
+                           this.cesium.Math.toRadians(orientation.heading || 0),
+                           this.cesium.Math.toRadians(orientation.pitch || -45),
+                           orientation.range || 0
+                       ) : undefined
+                   }).then(resolve);
+                   return;
+               }
+          }
+      }
+
+      // Default: Assume {lng, lat, alt} object
       this.viewer.camera.flyTo({
         destination: this.cesium.Cartesian3.fromDegrees(
-          position.lng, 
-          position.lat, 
-          position.alt
+          targetPos.lng, 
+          targetPos.lat, 
+          targetPos.alt
         ),
-        orientation: {
+        orientation: orientation ? {
           heading: this.cesium.Math.toRadians(orientation.heading),
           pitch: this.cesium.Math.toRadians(orientation.pitch),
           roll: this.cesium.Math.toRadians(orientation.roll)
-        },
+        } : undefined,
         duration: duration,
         complete: () => {
           resolve();

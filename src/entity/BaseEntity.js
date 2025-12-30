@@ -1,18 +1,21 @@
 
 import pointsManager from '../core/manager.js';
 import { getHeightListener } from '../utils/heightListener.js';
+import { deepClone } from '../utils/deepClone.js';
+import { generateCanvas } from '../utils/canvasGenerator.js';
 
 export class BaseEntity {
   constructor(id, viewer, cesium, options = {}) {
     this.id = id;
     this.viewer = viewer;
     this.cesium = cesium;
-    this.options = options;
+    // Deep copy options to prevent shared reference pollution
+    this.options = deepClone(options);
     
     // 1. Basic Properties
-    this.name = options.name || '';
-    this.description = options.description || '';
-    this.group = options.group || 'default';
+    this.name = this.options.name || '';
+    this.description = this.options.description || '';
+    this.group = this.options.group || 'default';
     this.type = 'base'; // Should be overridden
     
     // Internal Cesium Entity
@@ -45,7 +48,40 @@ export class BaseEntity {
 
   // --- Lifecycle ---
 
+  // --- Collection Management ---
+  
+  /**
+   * Get the entity collection where this entity should be stored.
+   * Default: viewer.entities (Root collection)
+   * Subclasses should override this to provide isolated collections.
+   */
+  getCollection() {
+      if (this.viewer) {
+          return this.viewer.entities;
+      }
+      return null;
+  }
+
+  // --- Lifecycle ---
+
+  /**
+   * Combine all current entities into a single Billboard image.
+   * This is chainable and modifies the behavior of .add().
+   * Instead of adding separate entities, .add() will generate a canvas
+   * from the current configuration and add a single BillboardEntity.
+   * @param {number} scaleFactor - Multiplier for canvas resolution (e.g. 2 for Retina/HighDPI). Default 1.
+   */
+  toCanvas(scaleFactor = 1) {
+    this._asCanvas = true;
+    this._canvasScale = scaleFactor;
+    return this;
+  }
+
   add() {
+    if (this._asCanvas) {
+        return this._addAsCanvas();
+    }
+
     // Define render priority: lower value = earlier mount (lower layer)
     // Billboard (0) -> Point/Geometry (1) -> Label (2)
     const priority = {
@@ -69,32 +105,211 @@ export class BaseEntity {
     return this;
   }
 
+  _addAsCanvas() {
+      // 1. Gather all entities in the collection
+      const entities = [...this._entityCollection];
+      
+      // 2. Sort by priority for correct layering on canvas
+      const priority = { 'billboard': 0, 'point': 1, 'geometry': 1, 'label': 2 };
+      entities.sort((a, b) => (priority[a.type] || 0) - (priority[b.type] || 0));
+      
+      // 3. Generate Canvas (Async)
+      // Since Cesium entities are sync, we create a placeholder BillboardEntity first
+      // and update its image when the promise resolves.
+      
+      // We need a host entity. We can reuse 'this' if it's a BillboardEntity, 
+      // or we need to create one if 'this' is a Point/Label.
+      // However, to keep it simple and consistent, let's look for a BillboardEntity in the chain
+      // or default to creating a new one on top of 'this'.
+      
+      // Actually, if we are converting everything to one image, we only need ONE entity to represent it.
+      // Let's use 'this' (the wrapper) but ensure the underlying Cesium entity is a Billboard.
+      
+      // If 'this' is NOT a BillboardEntity wrapper, we might have issues if user calls point-specific methods later.
+      // But 'toCanvas' implies the final result is an image.
+      
+      // Strategy:
+      // - Use 'this' ID.
+      // - Create a BillboardGraphics configuration.
+      // - Add it to the manager as a billboard type (even if wrapper says point).
+      // - This might be confusing for type checks, but efficient.
+      
+      // Better Strategy:
+      // If we are in 'toCanvas' mode, we act as a BillboardEntity.
+      
+      // Let's assume the position is based on the primary entity (this).
+      const position = this.position;
+      const heightReference = this.heightReference;
+      const heightOffset = this.heightOffset;
+      
+      // Prepare a callback property for the image to handle async loading
+      const imageProperty = new this.cesium.CallbackProperty((time, result) => {
+          if (this._canvasDataUrl) {
+              return this._canvasDataUrl;
+          }
+          // Return a transparent 1x1 pixel or loading placeholder until ready
+          // return canvas; 
+          return this._canvasDataUrl; // Undefined initially
+      }, false);
+      
+      // Create options for the new combined entity
+      // We should inherit common props from 'this'
+      const combinedOptions = {
+          id: this.id,
+          name: this.name,
+          position: this.cesium.Cartesian3.fromDegrees(
+              position[0], 
+              position[1], 
+              (heightReference === 'relativeToGround' ? heightOffset : (position[2] || 0) + heightOffset)
+          ),
+          billboard: {
+              image: imageProperty,
+              horizontalOrigin: this.cesium.HorizontalOrigin.CENTER,
+              verticalOrigin: this.cesium.VerticalOrigin.CENTER,
+              heightReference: (heightReference === 'clampToGround') 
+                  ? this.cesium.HeightReference.CLAMP_TO_GROUND 
+                  : this.cesium.HeightReference.RELATIVE_TO_GROUND,
+              disableDepthTestDistance: this.disableDepthTestDistance
+          }
+      };
+      
+      // Add to viewer via Manager (as a billboard)
+      // We need to register 'this' wrapper as the handler.
+      // Note: We are bypassing the standard _createEntity of subclasses.
+      
+      // Start the generation process
+      generateCanvas(entities, this._canvasScale || 1).then(result => {
+          // Handle both string (old) and object (new) return format
+          const dataUrl = typeof result === 'string' ? result : result.dataUrl;
+          this._canvasDataUrl = dataUrl;
+
+          // Update alignment and scale if metadata is available
+          if (typeof result === 'object' && result.centerX !== undefined && this.entity && this.entity.billboard) {
+               const s = this._canvasScale || 1;
+               const userScale = (this.scale !== undefined && this.scale !== null) ? this.scale : 1.0;
+               
+               // Set scale to match physical size (1/scaleFactor) * user desired scale
+               this.entity.billboard.scale = userScale / s;
+
+               // Adjust alignment to match the generated anchor point
+               // We use LEFT/TOP alignment for the billboard, and use pixelOffset to shift 
+               // the anchor point (centerX, centerY) to the entity's position.
+               this.entity.billboard.horizontalOrigin = this.cesium.HorizontalOrigin.LEFT;
+               this.entity.billboard.verticalOrigin = this.cesium.VerticalOrigin.TOP;
+               
+               // Pixel offset needs to scale with the user's scale (visual size)
+               // result.centerX/Y are in logical pixels.
+               this.entity.billboard.pixelOffset = new this.cesium.Cartesian2(
+                   -result.centerX * userScale, 
+                   -result.centerY * userScale
+               );
+
+               // Sync scaleByDistance with pixelOffsetScaleByDistance
+               // This is crucial for keeping the anchor point correct when the billboard scales by distance.
+               if (this.scaleByDistance) {
+                   // Ensure pixelOffset scales exactly the same way as the image
+                   this.entity.billboard.pixelOffsetScaleByDistance = this.entity.billboard.scaleByDistance;
+               }
+          }
+      }).catch(e => {
+          console.error('[CesiumFriendly] Failed to generate canvas', e);
+      });
+      
+      // Register with manager
+      // We treat it as a billboard for management purposes
+      const ds = pointsManager.getDataSource('cesium-friendly-billboards');
+      const e = ds.entities.add(combinedOptions);
+      this.entity = e;
+      
+      // Register this wrapper
+      // We might need to trick the manager into thinking this is a billboard wrapper if it was a point wrapper
+      // But manager uses 'type' prop of wrapper.
+      // Let's force update type to 'billboard' to ensure correct cleanup later?
+      // Or just leave it, as long as manager can remove it by ID.
+      // Cleanup uses ID, so it should be fine.
+      
+      pointsManager.registerEntity(this, { _reused: true });
+      
+      // Mark as mounted
+      this._destroyed = false;
+      
+      return this;
+  }
+
   _mount() {
-    if (!this.viewer) return;
+    this._destroyed = false;
+    
+    if (!this.viewer) {
+        console.error(`[CesiumFriendly Error] No viewer found in _mount for ${this.id}`);
+        return;
+    }
     
     // Create the Cesium entity if not already created
     if (!this.entity) {
       const created = this._createEntity();
       if (created) {
           this.entity = created;
+      } else {
+          console.error(`[CesiumFriendly Error] _createEntity returned null for ${this.id}`);
       }
+    } else {
+        // Entity already exists, skipping creation
     }
 
     if (!this.entity) {
-         // console.warn('CesiumFriendlyPlugin: No entity created for', this.type);
          return;
     }
     
-    // Add to viewer if not already added
-    if (!this.viewer.entities.getById(this.id)) {
-      this.viewer.entities.add(this.entity);
+    // Get the isolated collection
+    const collection = this.getCollection();
+    if (!collection) {
+        console.error(`[CesiumFriendly Error] No collection available for ${this.id}`);
+        return;
+    }
+
+    // Check for ID conflict and clean up potential ghost entities in the target collection
+    const existing = collection.getById(this.id);
+    let reused = false;
+
+    if (existing) {
+        const oldWrapper = pointsManager.getEntity(this.id);
+        // Optimization: If identical configuration, reuse the existing Cesium entity
+        // This prevents flickering and unnecessary cleanup/add cycles
+        if (oldWrapper && 
+            oldWrapper.type === this.type && 
+            JSON.stringify(oldWrapper.options) === JSON.stringify(this.options)) {
+            
+            this.entity = existing; // Adopt the living entity
+            reused = true;
+        } else {
+            // Full replacement
+            // Note: If this.entity is a plain object (config), add() returns the new instance
+            if (existing !== this.entity) {
+                 collection.remove(existing);
+                //  console.log(`[CesiumFriendly] Native Replacement Add:`, this.entity);
+                 const result = collection.add(this.entity);
+                 // If we passed a config object, update to the real entity instance
+                 if (!(this.entity instanceof this.cesium.Entity)) {
+                     this.entity = result;
+                 }
+            }
+        }
+    } else {
+        const result = collection.add(this.entity);
+        // If we passed a config object, update to the real entity instance
+        if (!(this.entity instanceof this.cesium.Entity)) {
+             this.entity = result;
+        }
     }
 
     // Register with manager
-    pointsManager.registerEntity(this, this.options); 
+    // Pass _reused flag so manager knows to skip destructive cleanup
+    pointsManager.registerEntity(this, { ...this.options, _reused: reused }); 
     
     // Auto-save initial state so restoreState() works without manual save
-    this.saveState();
+    if (!reused) {
+        this.saveState();
+    }
 
     this._enableHeightCheck();
     this._updateFinalVisibility();
@@ -218,9 +433,6 @@ export class BaseEntity {
         }
         
         // Intercept lifecycle methods that support animation
-        if (prop === 'add') {
-            return () => self.add(duration);
-        }
         if (prop === 'restoreState') {
             return () => self.restoreState(duration);
         }
@@ -310,7 +522,7 @@ export class BaseEntity {
                  });
              } catch (e) {
                  // Fallback: just set it at end
-                 console.warn('Animation color parse error', e);
+                 // console.warn('Animation color parse error', e);
              }
         }
         // C. Position Interpolation
@@ -448,14 +660,10 @@ export class BaseEntity {
       this._flashTimer = null;
     }
     
-    // Remove from viewer
-    if (this.viewer && this.entity) {
-      this.viewer.entities.remove(this.entity);
-    }
-    
-    // Remove from manager
-    // Note: pointsManager.removeEntity calls point.delete(), so the flag prevents recursion
-    pointsManager.removeEntity(this.id);
+    // Delegate all cleanup to manager to avoid redundant logic and ensure consistency
+    // manager.removeEntity handles removal from Cesium collections (CustomDataSource or Viewer)
+    // and cleanup of internal maps/timers.
+    pointsManager.removeEntity(this);
     
     this.entity = null;
     this._eventHandlers.clear();
@@ -660,7 +868,7 @@ export class BaseEntity {
         this._entityCollection.push(next);
         return next;
     }
-    console.warn('CesiumFriendlyPlugin: LabelEntity not registered.');
+    // console.warn('CesiumFriendlyPlugin: LabelEntity not registered.');
     return this;
   }
 
@@ -719,7 +927,7 @@ export class BaseEntity {
           return next;
       }
       
-      console.warn('CesiumFriendlyPlugin: BillboardEntity not registered.');
+      // console.warn('CesiumFriendlyPlugin: BillboardEntity not registered.');
       return this;
   }
 
