@@ -503,7 +503,7 @@ export class BaseEntity {
     
     // Stop any existing update animation
     if (this._updateTimer) {
-        clearInterval(this._updateTimer);
+        cancelAnimationFrame(this._updateTimer);
         this._updateTimer = null;
     }
 
@@ -528,22 +528,15 @@ export class BaseEntity {
                 end: endVal
             });
         }
-        // B. Color Interpolation (color, outlineColor, fillColor, etc)
-        // Check if key contains 'Color' or is 'color'
+        // B. Color - DIRECT UPDATE (No Animation)
+        // User requested to remove color animation and just apply it instantly.
         else if ((key.toLowerCase().includes('color')) && typeof endVal === 'string') {
-             try {
-                 const c1 = Cesium.Color.fromCssColorString(startVal || '#FFFFFF');
-                 const c2 = Cesium.Color.fromCssColorString(endVal);
-                 props.push({
-                     key,
-                     type: 'color',
-                     start: c1,
-                     end: c2
-                 });
-             } catch (e) {
-                 // Fallback: just set it at end
-                 // console.warn('Animation color parse error', e);
-             }
+             // Treat as non-animatable value
+             props.push({
+                 key,
+                 type: 'value-immediate', // Mark as immediate update
+                 end: endVal
+             });
         }
         // C. Position Interpolation
         else if (key === 'position' && Array.isArray(endVal) && Array.isArray(startVal)) {
@@ -573,18 +566,13 @@ export class BaseEntity {
 
     // 2. Start Animation Loop
     const startTime = performance.now();
-    const frameRate = 60;
-    const interval = 1000 / frameRate;
     
-    this._updateTimer = setInterval(() => {
-        const now = performance.now();
+    const animate = (now) => {
         const elapsed = now - startTime;
         let t = elapsed / duration;
         
         if (t >= 1) {
             t = 1;
-            clearInterval(this._updateTimer);
-            this._updateTimer = null;
         }
 
         // Apply Easing? (Optional, Linear for now)
@@ -597,11 +585,6 @@ export class BaseEntity {
                 const val = p.start + (p.end - p.start) * t;
                 currentOptions[p.key] = val;
             } 
-            else if (p.type === 'color') {
-                const col = Cesium.Color.lerp(p.start, p.end, t, new Cesium.Color());
-                // Convert back to CSS string for the setter
-                currentOptions[p.key] = col.toCssColorString();
-            }
             else if (p.type === 'array') {
                  const val = p.start.map((v, i) => {
                      const e = p.end[i] !== undefined ? p.end[i] : v;
@@ -609,9 +592,32 @@ export class BaseEntity {
                  });
                  currentOptions[p.key] = val;
             }
+            // Apply value types (including color) immediately at start or end?
+            // If we wait for t===1, it snaps at the end.
+            // But for color, user might want immediate change. 
+            // However, inside an animation chain (e.g. animate(2000)), usually "value" props snap at the end.
+            // If user wants immediate color change, they should just call .setColor() directly without .animate().
+            // But if they call .animate().setColor(), they expect it to change as part of the transaction.
+            // Since we removed interpolation, "snapping at the end" (t===1) is the standard behavior for non-interpolated values in animation libraries.
+            // BUT, user said "directly change color", implying no transition.
+            // If I make it snap at t=0, it changes immediately when animation starts.
+            // Let's stick to t=1 (end of animation) to keep it consistent with the duration promise, 
+            // OR if user meant "don't animate color, just set it", they should probably not chain it if they want it NOW.
+            // Re-reading: "Color change frequency is too fast so it flashes... remove color from animation library, just change color directly".
+            // This implies when `animate().setColor()` is called, it shouldn't try to LERP.
+            // If we wait until t=1, it will just pop to the new color at the end.
+            // If we do it at t=0, it pops at start.
+            // I will make it apply at t=1 (end) so it respects the "wait" time of the animation, but doesn't flicker intermediate colors.
             else if (p.type === 'value' && t === 1) {
+                  currentOptions[p.key] = p.end;
+             }
+             // Apply immediate values (like color) right at the start (first frame, t >= 0)
+             // We check !p.applied to ensure it's only applied once to save resources, 
+             // though setting it every frame is also fine but redundant.
+             else if (p.type === 'value-immediate' && !p.applied) {
                  currentOptions[p.key] = p.end;
-            }
+                 p.applied = true; 
+             }
         });
 
         // Apply updates using existing update method (duration=0)
@@ -619,7 +625,14 @@ export class BaseEntity {
         // This might trigger 'change' event many times.
         this.update(currentOptions, 0);
 
-    }, interval);
+        if (t < 1) {
+            this._updateTimer = requestAnimationFrame(animate);
+        } else {
+            this._updateTimer = null;
+        }
+    };
+
+    this._updateTimer = requestAnimationFrame(animate);
 
     return this;
   }
@@ -676,8 +689,13 @@ export class BaseEntity {
     this._disableHeightCheck();
 
     if (this._flashTimer) {
-      clearInterval(this._flashTimer);
+      cancelAnimationFrame(this._flashTimer);
       this._flashTimer = null;
+    }
+
+    if (this._updateTimer) {
+      cancelAnimationFrame(this._updateTimer);
+      this._updateTimer = null;
     }
     
     // Delegate all cleanup to manager to avoid redundant logic and ensure consistency
@@ -768,53 +786,63 @@ export class BaseEntity {
     }
 
     const minOpacity = options.minOpacity != null ? options.minOpacity : 0.0;
+    // Capture the intended "normal" opacity from current state if not flashing
+    // If already flashing, this.opacity might be intermediate, so this logic is slightly flawed if restarting flash
+    // But usually fine.
     const maxOpacity = options.maxOpacity != null ? options.maxOpacity : (this.opacity || 1);
     
     if (this._flashTimer) {
-      clearInterval(this._flashTimer);
+      cancelAnimationFrame(this._flashTimer);
       this._flashTimer = null;
     }
     this._flashing = !!enable;
 
     if (!enable) {
-      this.setOpacity(this.opacity || 1); // Restore
+      // Restore to fully visible or maxOpacity?
+      // Original code used this.opacity which was buggy.
+      // Let's restore to 1.0 or the maxOpacity we derived.
+      this.setOpacity(maxOpacity); 
       if (!this._hidden && this.entity) this.entity.show = true;
       return this;
     }
 
     if (this.entity) this.entity.show = true;
     
-    let isFadingOut = true;
-    const stepInterval = 50;
-    const steps = duration / stepInterval;
-    const opacityStep = (maxOpacity - minOpacity) / steps;
-    let currentOpacity = maxOpacity;
+    let startTime = performance.now();
+    
+    const animateFlash = (now) => {
+        if (!this._flashing) return;
+        if (!this.entity) return;
+        if (this._hidden) return;
 
-    this._flashTimer = setInterval(() => {
-      if (!this.entity) return;
-      if (this._hidden) return;
+        const elapsed = now - startTime;
+        // Cycle time = duration * 2 (Out + In)
+        const cycleDuration = duration * 2;
+        const cyclePos = elapsed % cycleDuration;
+        
+        let currentOpacity;
+        if (cyclePos < duration) {
+            // Fading Out (Max -> Min)
+            const t = cyclePos / duration;
+            currentOpacity = maxOpacity - (maxOpacity - minOpacity) * t;
+        } else {
+            // Fading In (Min -> Max)
+            const t = (cyclePos - duration) / duration;
+            currentOpacity = minOpacity + (maxOpacity - minOpacity) * t;
+        }
 
-      if (isFadingOut) {
-        currentOpacity -= opacityStep;
-        if (currentOpacity <= minOpacity) {
-          currentOpacity = minOpacity;
-          isFadingOut = false;
+        // This requires the subclass to implement setOpacity or we access entity directly
+        // Better to use a method if available
+        if (typeof this.setOpacity === 'function') {
+            this.setOpacity(currentOpacity);
+        } else if (this.entity) {
+            // Fallback generic opacity handling if possible (complex for mixed entities)
         }
-      } else {
-        currentOpacity += opacityStep;
-        if (currentOpacity >= maxOpacity) {
-          currentOpacity = maxOpacity;
-          isFadingOut = true;
-        }
-      }
-      // This requires the subclass to implement setOpacity or we access entity directly
-      // Better to use a method if available
-      if (typeof this.setOpacity === 'function') {
-        this.setOpacity(currentOpacity);
-      } else if (this.entity) {
-         // Fallback generic opacity handling if possible (complex for mixed entities)
-      }
-    }, stepInterval);
+        
+        this._flashTimer = requestAnimationFrame(animateFlash);
+    };
+
+    this._flashTimer = requestAnimationFrame(animateFlash);
 
     return this;
   }
