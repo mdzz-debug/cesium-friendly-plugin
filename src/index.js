@@ -59,11 +59,83 @@ pluginInstance.removeAll = () => pointsManager.removeAllEntities();
 // Old removeGroup/showGroup/hideGroup methods are removed to encourage chaining.
 
 pluginInstance.updatePosition = (id, position) => pointsManager.updateEntityPosition(id, position);
-pluginInstance.select = (idOrPoint) => {
-    const point = typeof idOrPoint === 'string' ? pointsManager.getEntity(idOrPoint) : idOrPoint;
-    if (point) pointsManager.select(point);
+pluginInstance.select = (idOrPointOrQuery) => {
+    // 1. If undefined/null/empty, treat as global deselect
+    if (!idOrPointOrQuery) {
+        pointsManager.deselect();
+        return;
+    }
+
+    // 2. Handle ID string or Entity object directly
+    const point = typeof idOrPointOrQuery === 'string' ? pointsManager.getEntity(idOrPointOrQuery) : idOrPointOrQuery;
+    
+    // If it's a valid single entity, select it
+    if (point && typeof point.select === 'function') {
+        point.select();
+        return point; // Return for chaining
+    }
+
+    // 3. Handle Query Object (e.g. { group: 'myGroup' }) or EntityGroup
+    if (typeof idOrPointOrQuery === 'object') {
+        // If it's an EntityGroup (array-like), select the first one or iterate?
+        // Selection is usually single-target in this manager.
+        // But user asked for "traverse selection" or "query selection".
+        // If multiple are matched, usually we can only "select" one primarily (highlighted),
+        // or we treat "select" on a group as "select the last one" or "highlight all"?
+        // The current pointsManager.select() only supports ONE active selection ID.
+        
+        // Strategy: 
+        // If it's a query/group, we might just return the found entities so user can chain .select() on them?
+        // BUT user said "trigger selection by query". 
+        // If multiple entities match, selecting ALL simultaneously is not supported by current single-select logic.
+        // So we will select the FIRST matching entity found.
+        
+        let target = null;
+        
+        // If it's an EntityGroup/Array
+        if (Array.isArray(idOrPointOrQuery)) {
+            if (idOrPointOrQuery.length > 0) target = idOrPointOrQuery[0];
+        } 
+        // If it's a query object (not an entity)
+        else if (!point && idOrPointOrQuery.constructor === Object) {
+            // Try to find entities matching query
+            // We can reuse entityApi.query() logic if exposed, or manual search
+            // For now simple support: { id: 'x' } or { group: 'g' }
+            if (idOrPointOrQuery.id) {
+                target = pointsManager.getEntity(idOrPointOrQuery.id);
+            } else if (idOrPointOrQuery.group) {
+                const ids = pointsManager.groups.get(idOrPointOrQuery.group);
+                if (ids && ids.size > 0) {
+                     const firstId = ids.values().next().value;
+                     target = pointsManager.getEntity(firstId);
+                }
+            }
+        }
+        
+        if (target) {
+            pointsManager.select(target);
+            return target;
+        }
+    }
+    
+    // If nothing found/selected, maybe deselect?
+    // User said "unselected can also be done by id or not passing anything (cancel all)"
+    // If id passed but not found -> Deselect? Or Warning?
+    // Usually safe to deselect if specific target requested but missing.
+    // pointsManager.deselect(); 
 };
-pluginInstance.deselect = () => pointsManager.deselect();
+pluginInstance.deselect = (idOrPoint) => {
+    if (!idOrPoint) {
+        pointsManager.deselect();
+        return;
+    }
+    
+    // Support deselecting specific entity only if it is currently selected
+    const id = typeof idOrPoint === 'string' ? idOrPoint : idOrPoint.id;
+    if (id && pointsManager.getSelectedId() === id) {
+        pointsManager.deselect();
+    }
+};
 pluginInstance.getSelected = () => pointsManager.getSelectedEntity();
 
 // Earth / Camera Control API

@@ -108,30 +108,18 @@ export class PointEntity extends GeometryEntity {
 
   setColor(color) {
     this.color = color;
-    if (this.entity && this.entity.point) {
-        this.entity.point.color = this.cesium.Color.fromCssColorString(this.color).withAlpha(this.opacity);
-    }
     this.trigger('change', this);
     return this;
   }
 
   setPixelSize(size) {
     this.pixelSize = size;
-    if (this.entity && this.entity.point) {
-        this.entity.point.pixelSize = this.pixelSize * this.scale;
-    }
     this.trigger('change', this);
     return this;
   }
 
   setOpacity(opacity) {
     this.opacity = opacity;
-    if (this.entity && this.entity.point) {
-        this.entity.point.color = this.cesium.Color.fromCssColorString(this.color).withAlpha(this.opacity);
-        if (this.outline) {
-            this.entity.point.outlineColor = this.cesium.Color.fromCssColorString(this.outlineColor).withAlpha(this.opacity);
-        }
-    }
     this.trigger('change', this);
     return this;
   }
@@ -141,12 +129,6 @@ export class PointEntity extends GeometryEntity {
     if (color) this.outlineColor = color;
     if (width) this.outlineWidth = width;
     
-    if (this.entity && this.entity.point) {
-        this.entity.point.outlineWidth = this.outline ? this.outlineWidth : 0;
-        this.entity.point.outlineColor = this.outline ? 
-            this.cesium.Color.fromCssColorString(this.outlineColor).withAlpha(this.opacity) : 
-            this.cesium.Color.TRANSPARENT;
-    }
     this.trigger('change', this);
     return this;
   }
@@ -155,17 +137,23 @@ export class PointEntity extends GeometryEntity {
 
   update(options, duration) {
       super.update(options, duration);
+      this._applyPointStyles();
+      return this;
+  }
+
+  _applyPointStyles() {
       if (this.entity && this.entity.point) {
           const Cesium = this.cesium;
           
-          // Outline (Special handling because outlineColor/Width don't have setters and might depend on order)
-          // We re-apply outline properties to ensure consistency
+          this.entity.point.color = Cesium.Color.fromCssColorString(this.color).withAlpha(this.opacity);
+          this.entity.point.pixelSize = this.pixelSize * this.scale;
+
+          // Outline
           this.entity.point.outlineWidth = this.outline ? this.outlineWidth : 0;
           this.entity.point.outlineColor = this.outline ? 
               Cesium.Color.fromCssColorString(this.outlineColor).withAlpha(this.opacity) : 
               Cesium.Color.TRANSPARENT;
       }
-      return this;
   }
 
   // --- State ---
@@ -192,6 +180,12 @@ export class PointEntity extends GeometryEntity {
   }
 
   restoreState(duration = 0) {
+    // If an animation is currently running, do not restore state to avoid conflict/flickering
+    if (this._updateTimer) {
+        // console.log(`[CesiumFriendly] restoreState skipped due to running animation on ${this.id}`);
+        return this;
+    }
+
     if (this._savedState) {
       const s = this._savedState;
       const options = {

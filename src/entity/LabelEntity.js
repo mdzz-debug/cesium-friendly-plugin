@@ -122,18 +122,12 @@ export class LabelEntity extends GeometryEntity {
 
   setText(text) {
     this.text = text;
-    if (this.entity && this.entity.label) {
-      this.entity.label.text = text;
-    }
     this.trigger('change', this);
     return this;
   }
 
   setFont(font) {
     this.font = font;
-    if (this.entity && this.entity.label) {
-      this.entity.label.font = font;
-    }
     this.trigger('change', this);
     return this;
   }
@@ -152,9 +146,6 @@ export class LabelEntity extends GeometryEntity {
 
   setColor(color) {
     this.color = color;
-    if (this.entity && this.entity.label) {
-      this.entity.label.fillColor = this.cesium.Color.fromCssColorString(color);
-    }
     this.trigger('change', this);
     return this;
   }
@@ -166,9 +157,6 @@ export class LabelEntity extends GeometryEntity {
 
   setOutlineColor(color) {
     this.outlineColor = color;
-    if (this.entity && this.entity.label) {
-      this.entity.label.outlineColor = this.cesium.Color.fromCssColorString(color);
-    }
     this.trigger('change', this);
     return this;
   }
@@ -176,18 +164,12 @@ export class LabelEntity extends GeometryEntity {
   setOutlineWidth(width) {
     const val = parseFloat(width);
     this.outlineWidth = isNaN(val) ? 1.0 : val;
-    if (this.entity && this.entity.label) {
-      this.entity.label.outlineWidth = this.outlineWidth;
-    }
     this.trigger('change', this);
     return this;
   }
 
   setShowBackground(show) {
     this.showBackground = !!show;
-    if (this.entity && this.entity.label) {
-      this.entity.label.showBackground = this.showBackground;
-    }
     this.trigger('change', this);
     return this;
   }
@@ -196,29 +178,41 @@ export class LabelEntity extends GeometryEntity {
     this.backgroundColor = color;
     // If color is provided, we default showBackground to true, 
     // unless user explicitly sets it to false later (but here we couple it for convenience)
-    // However, to allow independent control, we should only set it to true if it was false?
-    // Standard behavior: setting color implies you want to see it.
     this.showBackground = !!color;
-    if (this.entity && this.entity.label) {
-        if (color) {
-            this.entity.label.showBackground = true;
-            this.entity.label.backgroundColor = this.cesium.Color.fromCssColorString(color);
-        } else {
-            this.entity.label.showBackground = false;
-        }
-    }
     this.trigger('change', this);
     return this;
   }
 
   setStyle(style) {
     this.style = style;
-    if (this.entity && this.entity.label && this.cesium && this.cesium.LabelStyle) {
-        const styleEnum = this.cesium.LabelStyle[style];
-        this.entity.label.style = styleEnum !== undefined ? styleEnum : this.cesium.LabelStyle.FILL;
-    }
     this.trigger('change', this);
     return this;
+  }
+  
+  update(options, duration) {
+      super.update(options, duration);
+      this._applyLabelStyles();
+      return this;
+  }
+
+  _applyLabelStyles() {
+      if (!this.entity || !this.entity.label) return;
+      const Cesium = this.cesium;
+
+      this.entity.label.text = this.text;
+      this.entity.label.font = this.font;
+      
+      const styleEnum = Cesium.LabelStyle[this.style];
+      this.entity.label.style = styleEnum !== undefined ? styleEnum : Cesium.LabelStyle.FILL;
+      
+      this.entity.label.fillColor = Cesium.Color.fromCssColorString(this.color);
+      this.entity.label.outlineColor = Cesium.Color.fromCssColorString(this.outlineColor);
+      this.entity.label.outlineWidth = this.outlineWidth;
+      
+      this.entity.label.showBackground = this.showBackground;
+      if (this.backgroundColor) {
+          this.entity.label.backgroundColor = Cesium.Color.fromCssColorString(this.backgroundColor);
+      }
   }
 
   // --- Height Display Logic ---
@@ -315,6 +309,8 @@ export class LabelEntity extends GeometryEntity {
   }
 
   restoreState(duration = 0) {
+    if (this._updateTimer) return this;
+    
     if (this._savedState) {
       const s = this._savedState;
       const options = {

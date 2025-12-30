@@ -29,6 +29,11 @@ export function createEntityApi(pluginInstance) {
   const matchCriteria = (entity, criteria) => {
       if (!criteria) return true;
       
+      // Group check
+      if (criteria.group !== undefined && entity.group !== criteria.group) {
+          return false;
+      }
+
       // Color check (exact match for now)
       if (criteria.color !== undefined && entity.color !== criteria.color) {
           return false;

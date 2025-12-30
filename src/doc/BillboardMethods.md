@@ -38,6 +38,8 @@
 - `restoreState()`: 恢复保存的状态.
 - `show()`: 显示实体.
 - `hide()`: 隐藏实体.
+- `select()`: 选中当前实体 (触发选中事件).
+- `deselect()`: 取消选中 (如果当前选中是自己).
 - `delete()`: 删除实体 (销毁).
 - `update(options)`: 批量更新属性.
 - `draggable(enable)`: 开启/关闭拖拽功能 (Boolean).

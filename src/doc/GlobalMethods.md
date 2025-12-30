@@ -10,6 +10,13 @@
 ## 实体管理
 - `get(id)`: 获取指定 ID 的实体。
 - `getAll()`: 获取所有实体（返回 EntityGroup，支持链式操作）。
+- `query(criteria)`: 根据条件查询实体（返回 EntityGroup）。
+  - `criteria` (Object):
+    - `group` (String): 组名 (精确匹配)。
+    - `name` (String): 名称 (包含匹配)。
+    - `color` (String): 颜色 (精确匹配)。
+    - `minHeight` (Number): 最小高度。
+    - `maxHeight` (Number): 最大高度。
 - `remove(idOrPoint)`: 移除指定实体。
 - `delete(idOrPoint)`: 移除指定实体（`remove` 的别名）。
 - `removeAll()`: 移除所有实体。

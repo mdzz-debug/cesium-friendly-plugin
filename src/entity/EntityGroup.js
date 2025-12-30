@@ -107,7 +107,9 @@ export class EntityGroup extends Array {
   flash(enable, duration, options) { return this._broadcast('flash', enable, duration, options); }
   setGroup(name) { return this._broadcast('setGroup', name); }
   draggable(enable) { return this._broadcast('draggable', enable); }
-  
+  select() { return this._broadcast('select'); }
+  deselect() { return this._broadcast('deselect'); }
+
   _broadcast(methodName, ...args) {
       Array.prototype.forEach.call(this, entity => {
           if (entity && typeof entity[methodName] === 'function') {

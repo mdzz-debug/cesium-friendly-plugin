@@ -17,6 +17,7 @@ export class GeometryEntity extends BaseEntity {
   // --- Lifecycle ---
   
   add() {
+    if (this._destroyed) return this;
     if (this.group && this.position) {
       // Exclude ALL entities in the current collection from removal
       // This prevents removing peers when adding a composite entity
@@ -36,7 +37,12 @@ export class GeometryEntity extends BaseEntity {
         pointsManager.removeDuplicatesAtPosition(this.position, this.group, this.id);
     }
     
-    this._updateEntityPosition();
+    // Position is special - user expects immediate update usually, 
+    // but to strictly follow lifecycle, we should defer it?
+    // However, _updateEntityPosition is used internally.
+    // Let's keep it lazy as requested.
+    // this._updateEntityPosition();
+    
     this.trigger('change', this);
     return this;
   }
@@ -100,7 +106,6 @@ export class GeometryEntity extends BaseEntity {
       this.heightReference = 'relativeToGround';
     }
     
-    this._updateEntityPosition();
     this.trigger('change', this);
     return this;
   }
@@ -113,8 +118,6 @@ export class GeometryEntity extends BaseEntity {
     if (this.heightReference === 'clampToGround') {
       this.heightOffset = 0;
     }
-    this._updateHeightReference();
-    this._updateEntityPosition(); // Position might change based on height reference
     this.trigger('change', this);
     return this;
   }
@@ -123,19 +126,6 @@ export class GeometryEntity extends BaseEntity {
 
   setScale(scale) {
     this.scale = (scale !== undefined && scale !== null) ? scale : 1.0;
-    if (this.entity) {
-        if (this.entity.billboard) this.entity.billboard.scale = this.scale;
-        if (this.entity.label) this.entity.label.scale = this.scale;
-        // PointEntity handles scale differently (multiplied with pixelSize), so we might override or handle it there.
-        // But for generic scale property on entity.point (which doesn't exist), we can't do much.
-        // PointEntity.js overrides setScale to update pixelSize.
-        // However, if we put it here, we should ensure it doesn't break PointEntity.
-        // PointEntity's setScale updates pixelSize = this.pixelSize * this.scale.
-        // So we can check for point and do that if we have access to pixelSize.
-        if (this.entity.point && this.pixelSize !== undefined) {
-             this.entity.point.pixelSize = this.pixelSize * this.scale;
-        }
-    }
     this.trigger('change', this);
     return this;
   }
@@ -161,12 +151,6 @@ export class GeometryEntity extends BaseEntity {
     }
 
     this.pixelOffset = [x, y];
-    if (this.entity) {
-        const Cesium = this.cesium;
-        const pixelOffset = new Cesium.Cartesian2(x, y);
-        if (this.entity.billboard) this.entity.billboard.pixelOffset = pixelOffset;
-        if (this.entity.label) this.entity.label.pixelOffset = pixelOffset;
-    }
     this.trigger('change', this);
     return this;
   }
@@ -195,36 +179,18 @@ export class GeometryEntity extends BaseEntity {
     }
 
     this.eyeOffset = [x, y, z];
-    if (this.entity) {
-        const Cesium = this.cesium;
-        const eyeOffset = new Cesium.Cartesian3(x, y, z);
-        if (this.entity.billboard) this.entity.billboard.eyeOffset = eyeOffset;
-        if (this.entity.label) this.entity.label.eyeOffset = eyeOffset;
-    }
     this.trigger('change', this);
     return this;
   }
 
   setHorizontalOrigin(origin) {
-
     this.horizontalOrigin = origin;
-    if (this.entity) {
-        const val = this._getHorizontalOrigin(origin);
-        if (this.entity.billboard) this.entity.billboard.horizontalOrigin = val;
-        if (this.entity.label) this.entity.label.horizontalOrigin = val;
-    }
     this.trigger('change', this);
     return this;
   }
 
   setVerticalOrigin(origin) {
-
     this.verticalOrigin = origin;
-    if (this.entity) {
-        const val = this._getVerticalOrigin(origin);
-        if (this.entity.billboard) this.entity.billboard.verticalOrigin = val;
-        if (this.entity.label) this.entity.label.verticalOrigin = val;
-    }
     this.trigger('change', this);
     return this;
   }
@@ -232,12 +198,6 @@ export class GeometryEntity extends BaseEntity {
   setDistanceDisplayCondition(options) {
     if (options === null) {
         this.distanceDisplayCondition = undefined;
-        if (this.entity) {
-            const val = undefined;
-            if (this.entity.billboard) this.entity.billboard.distanceDisplayCondition = val;
-            if (this.entity.label) this.entity.label.distanceDisplayCondition = val;
-            if (this.entity.point) this.entity.point.distanceDisplayCondition = val;
-        }
         this.trigger('change', this);
         return this;
     }
@@ -257,13 +217,6 @@ export class GeometryEntity extends BaseEntity {
     }
 
     this.distanceDisplayCondition = { near: n, far: f };
-    
-    if (this.entity) {
-        const val = new this.cesium.DistanceDisplayCondition(n, f);
-        if (this.entity.billboard) this.entity.billboard.distanceDisplayCondition = val;
-        if (this.entity.label) this.entity.label.distanceDisplayCondition = val;
-        if (this.entity.point) this.entity.point.distanceDisplayCondition = val;
-    }
     this.trigger('change', this);
     return this;
   }
@@ -295,36 +248,12 @@ export class GeometryEntity extends BaseEntity {
   setScaleByDistance(options) {
     if (options === null) {
         this.scaleByDistance = undefined;
-        if (this.entity) {
-            const val = undefined;
-            if (this.entity.billboard) {
-                 this.entity.billboard.scaleByDistance = val;
-                 // If this is a canvas entity, we must also clear pixelOffsetScaleByDistance
-                 // because the offset depends on scale.
-                 if (this._asCanvas) {
-                     this.entity.billboard.pixelOffsetScaleByDistance = val;
-                 }
-            }
-            if (this.entity.label) this.entity.label.scaleByDistance = val;
-            if (this.entity.point) this.entity.point.scaleByDistance = val;
-        }
         this.trigger('change', this);
         return this;
     }
 
     const res = this._createNearFarScalar(options, this.scaleByDistance);
     this.scaleByDistance = res.obj;
-    if (this.entity) {
-        if (this.entity.billboard) {
-             this.entity.billboard.scaleByDistance = res.cesiumObj;
-             // Sync pixelOffsetScaleByDistance for canvas entities
-             if (this._asCanvas) {
-                 this.entity.billboard.pixelOffsetScaleByDistance = res.cesiumObj;
-             }
-        }
-        if (this.entity.label) this.entity.label.scaleByDistance = res.cesiumObj;
-        if (this.entity.point) this.entity.point.scaleByDistance = res.cesiumObj;
-    }
     this.trigger('change', this);
     return this;
   }
@@ -332,23 +261,12 @@ export class GeometryEntity extends BaseEntity {
   setTranslucencyByDistance(options) {
     if (options === null) {
         this.translucencyByDistance = undefined;
-        if (this.entity) {
-            const val = undefined;
-            if (this.entity.billboard) this.entity.billboard.translucencyByDistance = val;
-            if (this.entity.label) this.entity.label.translucencyByDistance = val;
-            if (this.entity.point) this.entity.point.translucencyByDistance = val;
-        }
         this.trigger('change', this);
         return this;
     }
 
     const res = this._createNearFarScalar(options, this.translucencyByDistance);
     this.translucencyByDistance = res.obj;
-    if (this.entity) {
-        if (this.entity.billboard) this.entity.billboard.translucencyByDistance = res.cesiumObj;
-        if (this.entity.label) this.entity.label.translucencyByDistance = res.cesiumObj;
-        if (this.entity.point) this.entity.point.translucencyByDistance = res.cesiumObj;
-    }
     this.trigger('change', this);
     return this;
   }
@@ -356,21 +274,12 @@ export class GeometryEntity extends BaseEntity {
   setPixelOffsetScaleByDistance(options) {
     if (options === null) {
         this.pixelOffsetScaleByDistance = undefined;
-        if (this.entity) {
-            const val = undefined;
-            if (this.entity.billboard) this.entity.billboard.pixelOffsetScaleByDistance = val;
-            if (this.entity.label) this.entity.label.pixelOffsetScaleByDistance = val;
-        }
         this.trigger('change', this);
         return this;
     }
 
     const res = this._createNearFarScalar(options, this.pixelOffsetScaleByDistance);
     this.pixelOffsetScaleByDistance = res.obj;
-    if (this.entity) {
-        if (this.entity.billboard) this.entity.billboard.pixelOffsetScaleByDistance = res.cesiumObj;
-        if (this.entity.label) this.entity.label.pixelOffsetScaleByDistance = res.cesiumObj;
-    }
     this.trigger('change', this);
     return this;
   }
@@ -383,22 +292,132 @@ export class GeometryEntity extends BaseEntity {
     } else {
         this.disableDepthTestDistance = distance;
     }
-    
-    if (this.entity) {
-        if (this.entity.billboard) this.entity.billboard.disableDepthTestDistance = this.disableDepthTestDistance;
-        if (this.entity.label) this.entity.label.disableDepthTestDistance = this.disableDepthTestDistance;
-        if (this.entity.point) this.entity.point.disableDepthTestDistance = this.disableDepthTestDistance;
-    }
     this.trigger('change', this);
     return this;
   }
 
   update(options, duration) {
-      if (options) {
-          super.update(options, duration);
-      }
-      this._updateEntityPosition();
+      // 1. Update internal options (setters)
+      super.update(options, duration);
+      
+      // 2. Apply all properties to entity
+      this._applyGeometryStyles();
+      
       return this;
+  }
+
+  _applyGeometryStyles() {
+      if (!this.entity) return;
+      const Cesium = this.cesium;
+
+      // Position & Height
+      this._updateEntityPosition();
+
+      // Scale
+      if (this.scale !== undefined) {
+         if (this.entity.billboard) this.entity.billboard.scale = this.scale;
+         if (this.entity.label) this.entity.label.scale = this.scale;
+         if (this.entity.point && this.pixelSize !== undefined) {
+             this.entity.point.pixelSize = this.pixelSize * this.scale;
+         }
+      }
+
+      // Pixel Offset
+      if (this.pixelOffset) {
+          const po = new Cesium.Cartesian2(this.pixelOffset[0], this.pixelOffset[1]);
+          if (this.entity.billboard) this.entity.billboard.pixelOffset = po;
+          if (this.entity.label) this.entity.label.pixelOffset = po;
+      }
+
+      // Eye Offset
+      if (this.eyeOffset) {
+          const eo = new Cesium.Cartesian3(this.eyeOffset[0], this.eyeOffset[1], this.eyeOffset[2]);
+          if (this.entity.billboard) this.entity.billboard.eyeOffset = eo;
+          if (this.entity.label) this.entity.label.eyeOffset = eo;
+      }
+
+      // Horizontal Origin
+      if (this.horizontalOrigin) {
+          const val = this._getHorizontalOrigin(this.horizontalOrigin);
+          if (this.entity.billboard) this.entity.billboard.horizontalOrigin = val;
+          if (this.entity.label) this.entity.label.horizontalOrigin = val;
+      }
+
+      // Vertical Origin
+      if (this.verticalOrigin) {
+          const val = this._getVerticalOrigin(this.verticalOrigin);
+          if (this.entity.billboard) this.entity.billboard.verticalOrigin = val;
+          if (this.entity.label) this.entity.label.verticalOrigin = val;
+      }
+
+      // Distance Display Condition
+      if (this.distanceDisplayCondition !== undefined) {
+          const val = this.distanceDisplayCondition ? 
+              new Cesium.DistanceDisplayCondition(this.distanceDisplayCondition.near, this.distanceDisplayCondition.far) : undefined;
+          if (this.entity.billboard) this.entity.billboard.distanceDisplayCondition = val;
+          if (this.entity.label) this.entity.label.distanceDisplayCondition = val;
+          if (this.entity.point) this.entity.point.distanceDisplayCondition = val;
+      }
+
+      // ScaleByDistance
+      if (this.scaleByDistance !== undefined) {
+          let val;
+          if (this.scaleByDistance) {
+              val = new Cesium.NearFarScalar(
+                  this.scaleByDistance.near, 
+                  this.scaleByDistance.nearValue, 
+                  this.scaleByDistance.far, 
+                  this.scaleByDistance.farValue
+              );
+          }
+          if (this.entity.billboard) {
+              this.entity.billboard.scaleByDistance = val;
+              if (this._asCanvas) {
+                  this.entity.billboard.pixelOffsetScaleByDistance = val;
+              }
+          }
+          if (this.entity.label) this.entity.label.scaleByDistance = val;
+          if (this.entity.point) this.entity.point.scaleByDistance = val;
+      }
+
+      // TranslucencyByDistance
+      if (this.translucencyByDistance !== undefined) {
+          let val;
+          if (this.translucencyByDistance) {
+              val = new Cesium.NearFarScalar(
+                  this.translucencyByDistance.near, 
+                  this.translucencyByDistance.nearValue, 
+                  this.translucencyByDistance.far, 
+                  this.translucencyByDistance.farValue
+              );
+          }
+          if (this.entity.billboard) this.entity.billboard.translucencyByDistance = val;
+          if (this.entity.label) this.entity.label.translucencyByDistance = val;
+          if (this.entity.point) this.entity.point.translucencyByDistance = val;
+      }
+
+      // PixelOffsetScaleByDistance
+      if (this.pixelOffsetScaleByDistance !== undefined) {
+          let val;
+          if (this.pixelOffsetScaleByDistance) {
+              val = new Cesium.NearFarScalar(
+                  this.pixelOffsetScaleByDistance.near, 
+                  this.pixelOffsetScaleByDistance.nearValue, 
+                  this.pixelOffsetScaleByDistance.far, 
+                  this.pixelOffsetScaleByDistance.farValue
+              );
+          }
+          if (this.entity.billboard) this.entity.billboard.pixelOffsetScaleByDistance = val;
+          if (this.entity.label) this.entity.label.pixelOffsetScaleByDistance = val;
+      }
+
+      // DisableDepthTestDistance
+      if (this.disableDepthTestDistance !== undefined) {
+          const val = this.disableDepthTestDistance;
+          if (this.entity.billboard) this.entity.billboard.disableDepthTestDistance = val;
+          if (this.entity.label) this.entity.label.disableDepthTestDistance = val;
+          if (this.entity.point) this.entity.point.disableDepthTestDistance = val;
+      }
   }
 
   setClampToGround(clamp = true) {

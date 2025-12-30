@@ -117,65 +117,62 @@ export class BillboardEntity extends GeometryEntity {
 
   setImage(url) {
     this.imageUrl = resolveImageInput(url);
-    if (this.entity && this.entity.billboard) {
-        this.entity.billboard.image = this.imageUrl;
-    }
     this.trigger('change', this);
     return this;
   }
 
   setRotation(degree) {
     this.rotation = degree;
-    if (this.entity && this.entity.billboard) {
-        this.entity.billboard.rotation = this.cesium.Math.toRadians(this.rotation);
-    }
     this.trigger('change', this);
     return this;
   }
 
   setColor(color) {
     this.color = color;
-    if (this.entity && this.entity.billboard) {
-        this.entity.billboard.color = this.cesium.Color.fromCssColorString(this.color).withAlpha(this.opacity);
-    }
     this.trigger('change', this);
     return this;
   }
 
   setOpacity(alpha) {
     this.opacity = alpha;
-    if (this.entity && this.entity.billboard) {
-        this.entity.billboard.color = this.cesium.Color.fromCssColorString(this.color).withAlpha(this.opacity);
-    }
     this.trigger('change', this);
     return this;
   }
   
   setImageWidth(width) {
     this.width = width;
-    if (this.entity && this.entity.billboard) {
-        this.entity.billboard.width = this.width;
-    }
     this.trigger('change', this);
     return this;
   }
 
   setImageHeight(height) {
     this.height = height;
-    if (this.entity && this.entity.billboard) {
-        this.entity.billboard.height = this.height;
-    }
     this.trigger('change', this);
     return this;
   }
 
   setSizeInMeters(enable) {
     this.sizeInMeters = enable;
-    if (this.entity && this.entity.billboard) {
-        this.entity.billboard.sizeInMeters = this.sizeInMeters;
-    }
     this.trigger('change', this);
     return this;
+  }
+
+  update(options, duration) {
+      super.update(options, duration);
+      this._applyBillboardStyles();
+      return this;
+  }
+
+  _applyBillboardStyles() {
+      if (this.entity && this.entity.billboard) {
+          const Cesium = this.cesium;
+          this.entity.billboard.image = this.imageUrl;
+          this.entity.billboard.rotation = Cesium.Math.toRadians(this.rotation);
+          this.entity.billboard.color = Cesium.Color.fromCssColorString(this.color).withAlpha(this.opacity);
+          this.entity.billboard.width = this.width;
+          this.entity.billboard.height = this.height;
+          this.entity.billboard.sizeInMeters = this.sizeInMeters;
+      }
   }
 
   // --- State ---
@@ -207,6 +204,8 @@ export class BillboardEntity extends GeometryEntity {
   }
 
   restoreState(duration = 0) {
+    if (this._updateTimer) return this;
+
     if (this._savedState) {
       const s = this._savedState;
       const options = {

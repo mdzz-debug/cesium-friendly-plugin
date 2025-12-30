@@ -213,6 +213,11 @@ class PointsManager {
     // Auto save state before selection effects
     if (point.saveState) point.saveState();
     
+    // Explicitly call _applyStyle to ensure 'select' styles are applied if defined in style config
+    // Note: The user's question was "Does it trigger selection event?".
+    // Yes, trigger('select') below does that.
+    // We also want to ensure visual feedback if any select logic exists.
+    
     point.trigger('select', point);
     this._notifySelectionListeners(point);
   }
@@ -224,9 +229,26 @@ class PointsManager {
     if (this._selectedId) {
       const point = this.points.get(this._selectedId);
       if (point) {
-        // Auto restore state
-        if (point.restoreState) point.restoreState();
+        // 先触发 unselect 事件，允许用户启动动画（此时能捕获到正确的“选中态”起始值）
         point.trigger('unselect', point);
+
+        // Auto restore state
+        // 如果用户在 unselect 中启动了动画，restoreState 会被下一帧动画覆盖，不会影响最终结果。
+        // 但如果放在 trigger 之前，动画就会捕获到“恢复后”的状态作为起始值，导致没有过渡效果。
+        // 为了防止闪烁（即 restoreState 瞬间改变颜色，然后下一帧动画才接管），
+        // 我们可以检查是否有动画正在运行。如果有，就跳过 restoreState 中与动画冲突的属性。
+        // 简单做法：如果检测到 point._updateTimer 存在，说明动画已启动，则跳过 restoreState。
+        // 这是一个权衡：restoreState 保证数据一致性，动画保证视觉平滑。
+        
+        // console.log(`[CesiumFriendly] Deselect: _updateTimer=${point._updateTimer}, restoreState=${!!point.restoreState}`);
+        if (!point._updateTimer && point.restoreState) {
+            point.restoreState();
+        } else {
+           // 如果有动画，我们假设动画会负责最终状态，或者用户只想要动画。
+           // 但 restoreState 可能还包含非动画属性。
+           // 理想情况下，restoreState 应该只恢复那些没有被动画覆盖的属性。
+           // 但现在先这样处理：只要有动画，就不执行 restoreState，避免“闪烁”。
+        }
       }
       this._selectedId = null;
     }

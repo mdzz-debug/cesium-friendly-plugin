@@ -78,6 +78,11 @@ export class BaseEntity {
   }
 
   add() {
+    if (this._destroyed || !this._entityCollection) {
+      // console.warn(`[CesiumFriendly] Cannot add destroyed entity ${this.id}`);
+      return this;
+    }
+
     if (this._asCanvas) {
         return this._addAsCanvas();
     }
@@ -329,6 +334,19 @@ export class BaseEntity {
     return this;
   }
 
+  select() {
+    pointsManager.select(this);
+    return this;
+  }
+
+  deselect() {
+    // 只有当自己被选中时才执行取消选中，避免误操作
+    if (pointsManager.getSelectedId() === this.id) {
+        pointsManager.deselect();
+    }
+    return this;
+  }
+
   _updateFinalVisibility() {
     if (this.entity) {
       this.entity.show = !this._hidden && this._heightVisible;
@@ -364,47 +382,48 @@ export class BaseEntity {
   // --- Update API ---
 
   update(options, duration = 0) {
-    if (!options || typeof options !== 'object') return this;
-    
     // Animation Hook
     if (duration > 0) {
-       return this._animateUpdate(options, duration);
+       return this._animateUpdate(options || {}, duration);
+    }
+
+    if (options && typeof options === 'object') {
+        Object.keys(options).forEach(key => {
+            const value = options[key];
+            
+            // 1. Delegate to composition methods
+            if (key === 'label' && typeof this.label === 'function') {
+                this.label(value);
+                return;
+            }
+            if (key === 'billboard' && typeof this.billboard === 'function') {
+                this.billboard(value);
+                return;
+            }
+    
+            // 2. Try setter: setKey(val)
+            const setterName = 'set' + key.charAt(0).toUpperCase() + key.slice(1);
+            if (typeof this[setterName] === 'function') {
+                this[setterName](value);
+            } 
+            // 3. Special properties
+            else if (key === 'position') {
+                 if (typeof this.setPosition === 'function') {
+                     this.setPosition(value);
+                 } else {
+                     this.position = value;
+                 }
+            }
+            // 4. Direct property set
+            else {
+                 this[key] = value;
+                 if (this.entity && (key === 'name' || key === 'description')) {
+                     this.entity[key] = value;
+                 }
+            }
+        });
     }
     
-    Object.keys(options).forEach(key => {
-        const value = options[key];
-        
-        // 1. Delegate to composition methods
-        if (key === 'label' && typeof this.label === 'function') {
-            this.label(value);
-            return;
-        }
-        if (key === 'billboard' && typeof this.billboard === 'function') {
-            this.billboard(value);
-            return;
-        }
-
-        // 2. Try setter: setKey(val)
-        const setterName = 'set' + key.charAt(0).toUpperCase() + key.slice(1);
-        if (typeof this[setterName] === 'function') {
-            this[setterName](value);
-        } 
-        // 3. Special properties
-        else if (key === 'position') {
-             if (typeof this.setPosition === 'function') {
-                 this.setPosition(value);
-             } else {
-                 this.position = value;
-             }
-        }
-        // 4. Direct property set
-        else {
-             this[key] = value;
-             if (this.entity && (key === 'name' || key === 'description')) {
-                 this.entity[key] = value;
-             }
-        }
-    });
     this.trigger('change', this);
     return this;
   }
@@ -490,7 +509,8 @@ export class BaseEntity {
 
     Object.keys(targetOptions).forEach(key => {
         const endVal = targetOptions[key];
-        const startVal = this[key];
+        // 如果 startVal 是 undefined，尝试从 options 中获取默认值
+        const startVal = this[key] !== undefined ? this[key] : (this.options[key]);
 
         // Skip if values are same (shallow check)
         if (endVal === startVal) return;
@@ -552,12 +572,12 @@ export class BaseEntity {
     if (props.length === 0) return this;
 
     // 2. Start Animation Loop
-    const startTime = Date.now();
-    const frameRate = 30; // 30fps is enough for property updates usually
+    const startTime = performance.now();
+    const frameRate = 60;
     const interval = 1000 / frameRate;
     
     this._updateTimer = setInterval(() => {
-        const now = Date.now();
+        const now = performance.now();
         const elapsed = now - startTime;
         let t = elapsed / duration;
         
@@ -730,6 +750,7 @@ export class BaseEntity {
       }
       const ttl = timestamp - Date.now();
       if (ttl <= 0) {
+        console.log('%c ⚠️ CesiumFriendlyPlugin Warning ', 'background: #f59e0b; color: white; padding: 2px 5px; border-radius: 2px; font-weight: bold;', `Entity ${this.id} expired immediately (timestamp ${timestamp} is in the past).`);
         this.delete();
       } else {
         pointsManager.updateTTL(this.id, ttl);
