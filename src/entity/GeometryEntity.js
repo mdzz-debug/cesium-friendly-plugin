@@ -102,7 +102,7 @@ export class GeometryEntity extends BaseEntity {
     this.heightOffset = (height !== undefined && height !== null) ? height : 0;
     
     // Auto update logic from old point.js
-    if (this.heightOffset > 0 && this.heightReference === 'clampToGround') {
+    if (this.heightOffset !== 0 && this.heightReference === 'clampToGround') {
       this.heightReference = 'relativeToGround';
     }
     

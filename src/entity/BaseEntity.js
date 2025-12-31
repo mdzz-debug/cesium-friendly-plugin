@@ -726,6 +726,9 @@ export class BaseEntity {
   }
 
   _startAnimation() {
+    if (this.type === 'geometry' && typeof this._startGeometryAnimation === 'function') {
+      return this._startGeometryAnimation();
+    }
     if (!this._animContext) return;
     
     this._animPending = false;
