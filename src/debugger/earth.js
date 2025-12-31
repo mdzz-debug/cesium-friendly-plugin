@@ -270,7 +270,7 @@ export function renderEarthDebugger(container, target, lang) {
   opacityRange.step = '0.1';
   opacityRange.value = '1';
   opacityRange.style.flex = '1';
-  opacityRange.oninput = (e) => flyManager.setSurfaceOpacity(parseFloat(e.target.value));
+  opacityRange.oninput = (e) => flyManager.setSurfaceOpacity(parseFloat(e.target.value)).update();
   opacityRow.appendChild(opacityRange);
   settingsSection.appendChild(opacityRow);
   

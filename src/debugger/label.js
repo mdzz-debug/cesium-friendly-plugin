@@ -250,7 +250,7 @@ export function renderLabelDebugger(container, label, lang = 'zh') {
   styleInput(heightInput);
 
   clampCheck.addEventListener('change', (e) => {
-    label.setClampToGround(e.target.checked);
+    label.setClampToGround(e.target.checked).update();
     if (e.target.checked) {
       heightInput.value = 0;
     }
@@ -259,7 +259,7 @@ export function renderLabelDebugger(container, label, lang = 'zh') {
   heightInput.addEventListener('input', (e) => {
     const val = parseFloat(e.target.value);
     if (!isNaN(val)) {
-      label.setHeight(val);
+      label.setHeight(val).update();
     }
   });
 
@@ -296,7 +296,7 @@ export function renderLabelDebugger(container, label, lang = 'zh') {
     const x = parseFloat(exInput.value) || 0;
     const y = parseFloat(eyInput.value) || 0;
     const z = parseFloat(ezInput.value) || 0;
-    label.setEyeOffset(x, y, z);
+    label.setEyeOffset(x, y, z).update();
   };
   exInput.addEventListener('input', updateEyeOffset);
   eyInput.addEventListener('input', updateEyeOffset);
@@ -329,7 +329,7 @@ export function renderLabelDebugger(container, label, lang = 'zh') {
   const updatePixelOffset = () => {
     const x = parseFloat(pxInput.value) || 0;
     const y = parseFloat(pyInput.value) || 0;
-    label.setPixelOffset(x, y);
+    label.setPixelOffset(x, y).update();
   };
   pxInput.addEventListener('input', updatePixelOffset);
   pyInput.addEventListener('input', updatePixelOffset);
@@ -353,7 +353,7 @@ export function renderLabelDebugger(container, label, lang = 'zh') {
   });
   tuneGridInput(hOriginSel);
   styleInput(hOriginSel);
-  hOriginSel.addEventListener('change', (e) => label.setHorizontalOrigin(e.target.value));
+  hOriginSel.addEventListener('change', (e) => label.setHorizontalOrigin(e.target.value).update());
 
   const vOriginSel = document.createElement('select');
   ['CENTER', 'BOTTOM', 'TOP', 'BASELINE'].forEach(o => {
@@ -365,7 +365,7 @@ export function renderLabelDebugger(container, label, lang = 'zh') {
   });
   tuneGridInput(vOriginSel);
   styleInput(vOriginSel);
-  vOriginSel.addEventListener('change', (e) => label.setVerticalOrigin(e.target.value));
+  vOriginSel.addEventListener('change', (e) => label.setVerticalOrigin(e.target.value).update());
 
   originContainer.appendChild(hOriginSel);
   originContainer.appendChild(vOriginSel);
@@ -389,7 +389,7 @@ export function renderLabelDebugger(container, label, lang = 'zh') {
   tuneWideInput(textInput);
   styleInput(textInput);
   textInput.addEventListener('input', (e) => {
-    label.setText(e.target.value);
+    label.setText(e.target.value).update();
   });
   textContainer.appendChild(textInput);
   textRow.appendChild(textContainer);
@@ -406,7 +406,7 @@ export function renderLabelDebugger(container, label, lang = 'zh') {
   tuneWideInput(fontInput);
   styleInput(fontInput);
   fontInput.addEventListener('change', (e) => {
-    label.setFont(e.target.value);
+    label.setFont(e.target.value).update();
   });
   fontContainer.appendChild(fontInput);
   fontRow.appendChild(fontContainer);
@@ -427,7 +427,7 @@ export function renderLabelDebugger(container, label, lang = 'zh') {
   fontSizeInput.addEventListener('input', (e) => {
     const val = parseInt(e.target.value, 10);
     if (!isNaN(val) && val > 0) {
-      label.setFontSize(val);
+      label.setFontSize(val).update();
     }
   });
 
@@ -444,7 +444,7 @@ export function renderLabelDebugger(container, label, lang = 'zh') {
   boldCheck.checked = !!label.bold;
   boldCheck.style.cursor = 'pointer';
   boldCheck.addEventListener('change', (e) => {
-    label.setBold(!!e.target.checked);
+    label.setBold(!!e.target.checked).update();
   });
   
   boldLabel.appendChild(boldCheck);
@@ -469,7 +469,7 @@ export function renderLabelDebugger(container, label, lang = 'zh') {
   });
   tuneWideInput(styleSel);
   styleInput(styleSel);
-  styleSel.addEventListener('change', (e) => label.setStyle(e.target.value));
+  styleSel.addEventListener('change', (e) => label.setStyle(e.target.value).update());
   styleContainer.appendChild(styleSel);
   styleRow.appendChild(styleContainer);
   styleSection.appendChild(styleRow);
@@ -490,7 +490,7 @@ export function renderLabelDebugger(container, label, lang = 'zh') {
   fillColorInput.style.background = 'transparent';
   fillColorInput.title = 'Fill Color';
   fillColorInput.style.cursor = 'pointer';
-  fillColorInput.addEventListener('input', (e) => label.setColor(e.target.value));
+  fillColorInput.addEventListener('input', (e) => label.setColor(e.target.value).update());
 
   const outlineColorInput = document.createElement('input');
   outlineColorInput.type = 'color';
@@ -502,7 +502,7 @@ export function renderLabelDebugger(container, label, lang = 'zh') {
   outlineColorInput.style.background = 'transparent';
   outlineColorInput.title = 'Outline Color';
   outlineColorInput.style.cursor = 'pointer';
-  outlineColorInput.addEventListener('input', (e) => label.setOutlineColor(e.target.value));
+  outlineColorInput.addEventListener('input', (e) => label.setOutlineColor(e.target.value).update());
 
   const outlineWidthInput = document.createElement('input');
   outlineWidthInput.type = 'number';
@@ -510,7 +510,7 @@ export function renderLabelDebugger(container, label, lang = 'zh') {
   outlineWidthInput.value = label.outlineWidth || 2;
   tuneNumberInput(outlineWidthInput, '110px');
   styleInput(outlineWidthInput);
-  outlineWidthInput.addEventListener('input', (e) => label.setOutlineWidth(parseFloat(e.target.value)));
+  outlineWidthInput.addEventListener('input', (e) => label.setOutlineWidth(parseFloat(e.target.value)).update());
 
   colorContainer.appendChild(fillColorInput);
   colorContainer.appendChild(outlineColorInput);
@@ -529,7 +529,7 @@ export function renderLabelDebugger(container, label, lang = 'zh') {
   bgCheck.checked = label.showBackground;
   bgCheck.style.cursor = 'pointer';
   bgCheck.addEventListener('change', (e) => {
-    label.setBackgroundColor(e.target.checked ? bgColorInput.value : null);
+    label.setBackgroundColor(e.target.checked ? bgColorInput.value : null).update();
   });
 
   const bgColorInput = document.createElement('input');
@@ -543,7 +543,7 @@ export function renderLabelDebugger(container, label, lang = 'zh') {
   bgColorInput.style.cursor = 'pointer';
   bgColorInput.addEventListener('input', (e) => {
     if (!bgCheck.checked) return;
-    label.setBackgroundColor(e.target.value);
+    label.setBackgroundColor(e.target.value).update();
   });
 
   bgContainer.appendChild(bgCheck);
@@ -564,7 +564,7 @@ export function renderLabelDebugger(container, label, lang = 'zh') {
   scaleInput.addEventListener('input', (e) => {
     const val = parseFloat(e.target.value);
     if (!isNaN(val) && val > 0) {
-      label.setScale(val);
+      label.setScale(val).update();
     }
   });
   scaleRow.appendChild(scaleInput);
@@ -600,7 +600,7 @@ export function renderLabelDebugger(container, label, lang = 'zh') {
   const updateDistance = () => {
     const n = parseFloat(nearInput.value) || 0;
     const f = parseFloat(farInput.value);
-    label.setDistanceDisplayCondition({ near: n, far: isNaN(f) ? undefined : f });
+    label.setDistanceDisplayCondition({ near: n, far: isNaN(f) ? undefined : f }).update();
   };
   nearInput.addEventListener('input', updateDistance);
   farInput.addEventListener('input', updateDistance);
@@ -652,7 +652,7 @@ export function renderLabelDebugger(container, label, lang = 'zh') {
       nearValue: isNaN(nv) ? undefined : nv,
       far: isNaN(f) ? undefined : f,
       farValue: isNaN(fv) ? undefined : fv
-    });
+    }).update();
   };
   snInput.addEventListener('input', updateScaleDist);
   snvInput.addEventListener('input', updateScaleDist);
@@ -709,7 +709,7 @@ export function renderLabelDebugger(container, label, lang = 'zh') {
         nearValue: isNaN(nv) ? undefined : nv, 
         far: isNaN(f) ? undefined : f, 
         farValue: isNaN(fv) ? undefined : fv 
-    });
+    }).update();
   };
   tnInput.addEventListener('input', updateTransByDist);
   tnvInput.addEventListener('input', updateTransByDist);
@@ -766,7 +766,7 @@ export function renderLabelDebugger(container, label, lang = 'zh') {
         nearValue: isNaN(nv) ? undefined : nv, 
         far: isNaN(f) ? undefined : f, 
         farValue: isNaN(fv) ? undefined : fv 
-    });
+    }).update();
   };
   posnInput.addEventListener('input', updatePosDist);
   posnvInput.addEventListener('input', updatePosDist);
@@ -810,7 +810,7 @@ export function renderLabelDebugger(container, label, lang = 'zh') {
   const updateVisH = () => {
     const min = parseFloat(minHInput.value) || 0;
     const max = parseFloat(maxHInput.value);
-    label.setDisplayHeightRange(min, isNaN(max) ? undefined : max);
+    label.setDisplayHeightRange(min, isNaN(max) ? undefined : max).update();
   };
   minHInput.addEventListener('input', updateVisH);
   maxHInput.addEventListener('input', updateVisH);
@@ -836,7 +836,7 @@ export function renderLabelDebugger(container, label, lang = 'zh') {
   depthLabel.style.color = '#ccc';
   
   depthCheck.addEventListener('change', (e) => {
-    label.setDisableDepthTestDistance(e.target.checked);
+    label.setDisableDepthTestDistance(e.target.checked ? Number.POSITIVE_INFINITY : undefined).update();
   });
   
   depthContainer.appendChild(depthCheck);

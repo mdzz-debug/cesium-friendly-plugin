@@ -257,7 +257,7 @@ export function renderBillboardDebugger(container, billboard, lang = 'zh') {
   styleInput(heightInput);
 
   clampCheck.addEventListener('change', (e) => {
-    billboard.setClampToGround(e.target.checked);
+    billboard.setClampToGround(e.target.checked).update();
     if (e.target.checked) {
       heightInput.value = 0;
     }
@@ -266,7 +266,7 @@ export function renderBillboardDebugger(container, billboard, lang = 'zh') {
   heightInput.addEventListener('input', (e) => {
     const val = parseFloat(e.target.value);
     if (!isNaN(val)) {
-      billboard.setHeight(val); // Inherited from GeometryEntity
+      billboard.setHeight(val).update(); // Inherited from GeometryEntity
     }
   });
 
@@ -290,7 +290,7 @@ export function renderBillboardDebugger(container, billboard, lang = 'zh') {
   tuneWideInput(imageInput);
   styleInput(imageInput);
   imageInput.addEventListener('change', (e) => {
-    billboard.setImage(e.target.value);
+    billboard.setImage(e.target.value).update();
   });
 
   imageContainer.appendChild(imageInput);
@@ -317,12 +317,12 @@ export function renderBillboardDebugger(container, billboard, lang = 'zh') {
 
   wInput.addEventListener('input', (e) => {
       const v = parseFloat(e.target.value);
-      if(!isNaN(v)) billboard.setImageWidth(v);
+      if(!isNaN(v)) billboard.setImageWidth(v).update();
   });
 
   hInput.addEventListener('input', (e) => {
       const v = parseFloat(e.target.value);
-      if(!isNaN(v)) billboard.setImageHeight(v);
+      if(!isNaN(v)) billboard.setImageHeight(v).update();
   });
 
   dimContainer.appendChild(wInput);
@@ -338,7 +338,7 @@ export function renderBillboardDebugger(container, billboard, lang = 'zh') {
   metersCheck.style.marginLeft = 'auto';
   metersCheck.style.cursor = 'pointer';
   metersCheck.addEventListener('change', (e) => {
-      billboard.setSizeInMeters(e.target.checked);
+      billboard.setSizeInMeters(e.target.checked).update();
   });
   metersRow.appendChild(metersCheck);
   styleSection.appendChild(metersRow);
@@ -356,7 +356,7 @@ export function renderBillboardDebugger(container, billboard, lang = 'zh') {
   scaleInput.addEventListener('input', (e) => {
     const val = parseFloat(e.target.value);
     if (!isNaN(val) && val > 0) {
-      billboard.setScale(val);
+      billboard.setScale(val).update();
     }
   });
   scaleRow.appendChild(scaleInput);
@@ -374,7 +374,7 @@ export function renderBillboardDebugger(container, billboard, lang = 'zh') {
   rotationInput.addEventListener('input', (e) => {
     const val = parseFloat(e.target.value);
     if (!isNaN(val)) {
-      billboard.setRotation(val);
+      billboard.setRotation(val).update();
     }
   });
   rotationRow.appendChild(rotationInput);
@@ -394,7 +394,7 @@ export function renderBillboardDebugger(container, billboard, lang = 'zh') {
   });
   tuneGridInput(hOriginSel);
   styleInput(hOriginSel);
-  hOriginSel.addEventListener('change', (e) => billboard.setHorizontalOrigin(e.target.value));
+  hOriginSel.addEventListener('change', (e) => billboard.setHorizontalOrigin(e.target.value).update());
 
   const vOriginSel = document.createElement('select');
   ['CENTER', 'BOTTOM', 'TOP', 'BASELINE'].forEach(o => {
@@ -406,7 +406,7 @@ export function renderBillboardDebugger(container, billboard, lang = 'zh') {
   });
   tuneGridInput(vOriginSel);
   styleInput(vOriginSel);
-  vOriginSel.addEventListener('change', (e) => billboard.setVerticalOrigin(e.target.value));
+  vOriginSel.addEventListener('change', (e) => billboard.setVerticalOrigin(e.target.value).update());
 
   originContainer.appendChild(hOriginSel);
   originContainer.appendChild(vOriginSel);
@@ -426,7 +426,7 @@ export function renderBillboardDebugger(container, billboard, lang = 'zh') {
   colorInput.style.padding = '0';
   colorInput.style.background = 'transparent';
   colorInput.addEventListener('input', (e) => {
-    billboard.setColor(e.target.value);
+    billboard.setColor(e.target.value).update();
   });
   colorRow.appendChild(colorInput);
   styleSection.appendChild(colorRow);
@@ -444,7 +444,7 @@ export function renderBillboardDebugger(container, billboard, lang = 'zh') {
   opacityInput.style.cursor = 'pointer';
   opacityInput.addEventListener('input', (e) => {
     const val = parseFloat(e.target.value);
-    billboard.setOpacity(val);
+    billboard.setOpacity(val).update();
   });
   opacityRow.appendChild(opacityInput);
   styleSection.appendChild(opacityRow);
@@ -470,7 +470,7 @@ export function renderBillboardDebugger(container, billboard, lang = 'zh') {
   const updatePixelOffset = () => {
     const x = parseFloat(pxInput.value) || 0;
     const y = parseFloat(pyInput.value) || 0;
-    billboard.setPixelOffset(x, y);
+    billboard.setPixelOffset(x, y).update();
   };
   pxInput.addEventListener('input', updatePixelOffset);
   pyInput.addEventListener('input', updatePixelOffset);
@@ -509,7 +509,7 @@ export function renderBillboardDebugger(container, billboard, lang = 'zh') {
     const x = parseFloat(exInput.value) || 0;
     const y = parseFloat(eyInput.value) || 0;
     const z = parseFloat(ezInput.value) || 0;
-    billboard.setEyeOffset(x, y, z);
+    billboard.setEyeOffset(x, y, z).update();
   };
   exInput.addEventListener('input', updateEyeOffset);
   eyInput.addEventListener('input', updateEyeOffset);
@@ -548,7 +548,7 @@ export function renderBillboardDebugger(container, billboard, lang = 'zh') {
   const updateDistance = () => {
     const n = parseFloat(nearInput.value) || 0;
     const f = parseFloat(farInput.value);
-    billboard.setDistanceDisplayCondition({ near: n, far: isNaN(f) ? undefined : f });
+    billboard.setDistanceDisplayCondition({ near: n, far: isNaN(f) ? undefined : f }).update();
   };
   nearInput.addEventListener('input', updateDistance);
   farInput.addEventListener('input', updateDistance);
@@ -581,7 +581,7 @@ export function renderBillboardDebugger(container, billboard, lang = 'zh') {
   const updateDisplayHeight = () => {
     const minVal = parseFloat(minHeightInput.value);
     const maxVal = parseFloat(maxHeightInput.value);
-    billboard.setDisplayCondition({ min: isNaN(minVal) ? 0 : minVal, max: isNaN(maxVal) ? 0 : maxVal });
+    billboard.setDisplayCondition({ min: isNaN(minVal) ? 0 : minVal, max: isNaN(maxVal) ? 0 : maxVal }).update();
   };
   minHeightInput.addEventListener('input', updateDisplayHeight);
   maxHeightInput.addEventListener('input', updateDisplayHeight);
@@ -634,7 +634,7 @@ export function renderBillboardDebugger(container, billboard, lang = 'zh') {
         nearValue: isNaN(nv) ? undefined : nv, 
         far: isNaN(f) ? undefined : f, 
         farValue: isNaN(fv) ? undefined : fv 
-    });
+    }).update();
   };
   snInput.addEventListener('input', updateScaleByDist);
   snvInput.addEventListener('input', updateScaleByDist);
@@ -691,7 +691,7 @@ export function renderBillboardDebugger(container, billboard, lang = 'zh') {
         nearValue: isNaN(nv) ? undefined : nv, 
         far: isNaN(f) ? undefined : f, 
         farValue: isNaN(fv) ? undefined : fv 
-    });
+    }).update();
   };
   tnInput.addEventListener('input', updateTransByDist);
   tnvInput.addEventListener('input', updateTransByDist);
@@ -748,7 +748,7 @@ export function renderBillboardDebugger(container, billboard, lang = 'zh') {
         nearValue: isNaN(nv) ? undefined : nv, 
         far: isNaN(f) ? undefined : f, 
         farValue: isNaN(fv) ? undefined : fv 
-    });
+    }).update();
   };
   posnInput.addEventListener('input', updatePosDist);
   posnvInput.addEventListener('input', updatePosDist);
@@ -788,7 +788,7 @@ export function renderBillboardDebugger(container, billboard, lang = 'zh') {
   depthTestLabel.style.color = '#ccc';
 
   depthTestCheck.addEventListener('change', (e) => {
-    billboard.setDisableDepthTestDistance(e.target.checked ? Number.POSITIVE_INFINITY : undefined);
+    billboard.setDisableDepthTestDistance(e.target.checked ? Number.POSITIVE_INFINITY : undefined).update();
   });
 
   depthTestContainer.appendChild(depthTestCheck);

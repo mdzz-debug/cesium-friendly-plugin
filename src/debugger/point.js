@@ -224,7 +224,7 @@ export function renderPointDebugger(container, point, lang = 'zh') {
 
   // Events
   clampCheck.addEventListener('change', (e) => {
-    point.setClampToGround(e.target.checked);
+    point.setClampToGround(e.target.checked).update();
     if (e.target.checked) {
       heightInput.value = 0;
     }
@@ -233,7 +233,7 @@ export function renderPointDebugger(container, point, lang = 'zh') {
   heightInput.addEventListener('input', (e) => {
     const val = parseFloat(e.target.value);
     if (!isNaN(val)) {
-      point.setHeight(val);
+      point.setHeight(val).update();
     }
   });
 
@@ -262,7 +262,7 @@ export function renderPointDebugger(container, point, lang = 'zh') {
   colorInput.style.padding = '0';
   colorInput.style.background = 'transparent';
   colorInput.addEventListener('input', (e) => {
-    point.setColor(e.target.value);
+    point.setColor(e.target.value).update();
   });
   colorRow.appendChild(colorInput);
   styleSection.appendChild(colorRow);
@@ -280,7 +280,7 @@ export function renderPointDebugger(container, point, lang = 'zh') {
   sizeInput.addEventListener('input', (e) => {
     const val = parseInt(e.target.value);
     if (!isNaN(val) && val > 0) {
-      point.setPixelSize(val);
+      point.setPixelSize(val).update();
     }
   });
   sizeRow.appendChild(sizeInput);
@@ -299,7 +299,7 @@ export function renderPointDebugger(container, point, lang = 'zh') {
   opacityInput.style.cursor = 'pointer';
   opacityInput.addEventListener('input', (e) => {
     const val = parseFloat(e.target.value);
-    point.setOpacity(val);
+    point.setOpacity(val).update();
   });
   opacityRow.appendChild(opacityInput);
   styleSection.appendChild(opacityRow);
@@ -337,7 +337,7 @@ export function renderPointDebugger(container, point, lang = 'zh') {
       outlineCheck.checked,
       outlineColorInput.value,
       parseInt(outlineWidthInput.value)
-    );
+    ).update();
   };
 
   outlineCheck.addEventListener('change', updateOutline);
@@ -414,7 +414,7 @@ export function renderPointDebugger(container, point, lang = 'zh') {
   const updateDistance = () => {
     const n = parseFloat(nearInput.value) || 0;
     const f = parseFloat(farInput.value);
-    point.setDistanceDisplayCondition({ near: n, far: isNaN(f) ? undefined : f });
+    point.setDistanceDisplayCondition({ near: n, far: isNaN(f) ? undefined : f }).update();
   };
   nearInput.addEventListener('input', updateDistance);
   farInput.addEventListener('input', updateDistance);
@@ -453,7 +453,7 @@ export function renderPointDebugger(container, point, lang = 'zh') {
       point.setDisplayCondition({
           min: isNaN(minVal) ? 0 : minVal,
           max: isNaN(maxVal) ? undefined : maxVal
-      });
+      }).update();
     } else {
       // Fallback manual update
       point.minDisplayHeight = isNaN(minVal) ? 0 : minVal;
@@ -525,7 +525,7 @@ export function renderPointDebugger(container, point, lang = 'zh') {
         nearValue: isNaN(nv) ? undefined : nv, 
         far: isNaN(f) ? undefined : f, 
         farValue: isNaN(fv) ? undefined : fv 
-    });
+    }).update();
   };
   snInput.addEventListener('input', updateScaleByDist);
   snvInput.addEventListener('input', updateScaleByDist);
@@ -593,7 +593,7 @@ export function renderPointDebugger(container, point, lang = 'zh') {
         nearValue: isNaN(nv) ? undefined : nv, 
         far: isNaN(f) ? undefined : f, 
         farValue: isNaN(fv) ? undefined : fv 
-    });
+    }).update();
   };
   tnInput.addEventListener('input', updateTransByDist);
   tnvInput.addEventListener('input', updateTransByDist);
@@ -627,7 +627,7 @@ export function renderPointDebugger(container, point, lang = 'zh') {
 
   depthTestCheck.addEventListener('change', (e) => {
     // If checked (Always On Top), we set to Infinity. Otherwise undefined (default depth test)
-    point.setDisableDepthTestDistance(e.target.checked ? Number.POSITIVE_INFINITY : undefined);
+    point.setDisableDepthTestDistance(e.target.checked ? Number.POSITIVE_INFINITY : undefined).update();
   });
 
   depthTestContainer.appendChild(depthTestCheck);

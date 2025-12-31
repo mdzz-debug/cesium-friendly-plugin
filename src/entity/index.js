@@ -3,6 +3,7 @@ import { GeometryEntity } from './GeometryEntity.js';
 import { PointEntity as PointEntityClass } from './PointEntity.js';
 import { BillboardEntity as BillboardEntityClass } from './BillboardEntity.js';
 import { LabelEntity as LabelEntityClass } from './LabelEntity.js';
+import { SmartGeometryEntity as SmartGeometryEntityClass } from './SmartGeometryEntity.js';
 import { EntityGroup } from './EntityGroup.js';
 import pointsManager from '../core/manager.js';
 
@@ -150,6 +151,7 @@ export function createEntityApi(pluginInstance) {
     point: createFactory(PointEntityClass, 'point'),
     billboard: createFactory(BillboardEntityClass, 'billboard'),
     label: createFactory(LabelEntityClass, 'label'),
+    geometry: createFactory(SmartGeometryEntityClass, 'geometry'),
     
     // Future types placeholders
     polyline: (arg1, arg2) => {
@@ -168,4 +170,4 @@ BaseEntity.Types = {
     LabelEntity: LabelEntityClass
 };
 
-export { BaseEntity, GeometryEntity, PointEntityClass as PointEntity, BillboardEntityClass as BillboardEntity, LabelEntityClass as LabelEntity, EntityGroup };
+export { BaseEntity, GeometryEntity, PointEntityClass as PointEntity, BillboardEntityClass as BillboardEntity, LabelEntityClass as LabelEntity, SmartGeometryEntityClass as SmartGeometryEntity, EntityGroup };

@@ -149,11 +149,17 @@ class FlyManager {
     if (!this.viewer) return;
     this.viewer.scene.globe.translucency.enabled = opacity < 1.0;
     this.viewer.scene.globe.translucency.frontFaceAlpha = opacity;
+    return this;
   }
 
   setDepthTest(enabled) {
     if (!this.viewer) return;
     this.viewer.scene.globe.depthTestAgainstTerrain = enabled;
+    return this;
+  }
+
+  update() {
+    return this;
   }
 }
 

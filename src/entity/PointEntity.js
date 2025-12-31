@@ -40,6 +40,10 @@ export class PointEntity extends GeometryEntity {
     this.outline = opts.outline || false;
     this.outlineColor = opts.outlineColor || '#FFFFFF';
     this.outlineWidth = opts.outlineWidth || 2;
+    this._colorCached = this.cesium.Color.fromCssColorString(this.color);
+    this._colorCached.alpha = this.opacity;
+    this._outlineColorCached = this.cesium.Color.fromCssColorString(this.outlineColor);
+    this._outlineColorCached.alpha = this.opacity;
     
     // Advanced props
     this.eyeOffset = opts.eyeOffset; // {x, y, z}
@@ -66,8 +70,8 @@ export class PointEntity extends GeometryEntity {
     const pointGraphics = new Cesium.PointGraphics({
         color: Cesium.Color.fromCssColorString(this.color).withAlpha(this.opacity),
         pixelSize: this.pixelSize * this.scale,
-        outlineWidth: this.outline ? this.outlineWidth : 0,
-        outlineColor: this.outline ? Cesium.Color.fromCssColorString(this.outlineColor).withAlpha(this.opacity) : Cesium.Color.TRANSPARENT,
+        outlineWidth: (this.outline && this.outlineWidth > 0) ? this.outlineWidth : 0,
+        outlineColor: (this.outline && this.outlineWidth > 0) ? Cesium.Color.fromCssColorString(this.outlineColor).withAlpha(this.opacity) : Cesium.Color.TRANSPARENT,
         heightReference: this._getHeightReferenceEnum(),
         distanceDisplayCondition: this.distanceDisplayCondition ? 
             new Cesium.DistanceDisplayCondition(this.distanceDisplayCondition.near, this.distanceDisplayCondition.far) : undefined,
@@ -108,6 +112,10 @@ export class PointEntity extends GeometryEntity {
 
   setColor(color) {
     this.color = color;
+    if (this.cesium) {
+      this._colorCached = this.cesium.Color.fromCssColorString(this.color);
+      this._colorCached.alpha = this.opacity;
+    }
     this.trigger('change', this);
     return this;
   }
@@ -120,6 +128,24 @@ export class PointEntity extends GeometryEntity {
 
   setOpacity(opacity) {
     this.opacity = opacity;
+    if (this._colorCached) this._colorCached.alpha = this.opacity;
+    if (this._outlineColorCached) this._outlineColorCached.alpha = this.opacity;
+    this.trigger('change', this);
+    return this;
+  }
+
+  setOutlineColor(color) {
+    this.outlineColor = color;
+    if (this.cesium) {
+      this._outlineColorCached = this.cesium.Color.fromCssColorString(this.outlineColor);
+      this._outlineColorCached.alpha = this.opacity;
+    }
+    this.trigger('change', this);
+    return this;
+  }
+
+  setOutlineWidth(width) {
+    this.outlineWidth = width;
     this.trigger('change', this);
     return this;
   }
@@ -145,14 +171,26 @@ export class PointEntity extends GeometryEntity {
       if (this.entity && this.entity.point) {
           const Cesium = this.cesium;
           
-          this.entity.point.color = Cesium.Color.fromCssColorString(this.color).withAlpha(this.opacity);
-          this.entity.point.pixelSize = this.pixelSize * this.scale;
-
-          // Outline
-          this.entity.point.outlineWidth = this.outline ? this.outlineWidth : 0;
-          this.entity.point.outlineColor = this.outline ? 
-              Cesium.Color.fromCssColorString(this.outlineColor).withAlpha(this.opacity) : 
-              Cesium.Color.TRANSPARENT;
+          if (!this._inUpdateAnimation) {
+            // Color
+            const c = this._colorCached || Cesium.Color.fromCssColorString(this.color);
+            this.entity.point.color = c;
+            
+            // Pixel Size
+            this.entity.point.pixelSize = this.pixelSize * this.scale;
+            
+            // Outline Width & Color
+            // If width is 0, we force transparent color to prevent 1px visible lines
+            const width = (this.outline && this.outlineWidth > 0) ? this.outlineWidth : 0;
+            this.entity.point.outlineWidth = width;
+            
+            if (width > 0) {
+               const oc = this._outlineColorCached || Cesium.Color.fromCssColorString(this.outlineColor);
+               this.entity.point.outlineColor = oc;
+            } else {
+               this.entity.point.outlineColor = Cesium.Color.TRANSPARENT;
+            }
+          }
       }
   }
 

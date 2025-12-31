@@ -1,5 +1,6 @@
 
 import pointsManager from '../core/manager.js';
+import canvasManager from '../core/canvasManager.js';
 import { getHeightListener } from '../utils/heightListener.js';
 import { deepClone } from '../utils/deepClone.js';
 import { generateCanvas } from '../utils/canvasGenerator.js';
@@ -56,10 +57,12 @@ export class BaseEntity {
    * Subclasses should override this to provide isolated collections.
    */
   getCollection() {
-      if (this.viewer) {
-          return this.viewer.entities;
+      if (!this.viewer) return null;
+      if (this._asCanvas) {
+          const ds = canvasManager.getDataSource('cesium-friendly-canvas');
+          return ds ? ds.entities : this.viewer.entities;
       }
-      return null;
+      return this.viewer.entities;
   }
 
   // --- Lifecycle ---
@@ -74,6 +77,7 @@ export class BaseEntity {
   toCanvas(scaleFactor = 1) {
     this._asCanvas = true;
     this._canvasScale = scaleFactor;
+    this.isCanvas = true;
     return this;
   }
 
@@ -147,14 +151,22 @@ export class BaseEntity {
       const heightReference = this.heightReference;
       const heightOffset = this.heightOffset;
       
+      const excludeIds = this._entityCollection ? this._entityCollection.map(e => e.id) : [this.id];
+      pointsManager.removeDuplicatesAtPosition(this.position, this.group, excludeIds);
+      
+      const ds = canvasManager.getDataSource('cesium-friendly-canvas');
+      if (ds) {
+          const existing = ds.entities.getById(this.id);
+          if (existing) ds.entities.remove(existing);
+      }
+      
       // Prepare a callback property for the image to handle async loading
       const imageProperty = new this.cesium.CallbackProperty((time, result) => {
           if (this._canvasDataUrl) {
               return this._canvasDataUrl;
           }
-          // Return a transparent 1x1 pixel or loading placeholder until ready
-          // return canvas; 
-          return this._canvasDataUrl; // Undefined initially
+          // Return a transparent 1x1 pixel placeholder until ready
+          return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAuMB9oS8WZsAAAAASUVORK5CYII=';
       }, false);
       
       // Create options for the new combined entity
@@ -174,7 +186,21 @@ export class BaseEntity {
               heightReference: (heightReference === 'clampToGround') 
                   ? this.cesium.HeightReference.CLAMP_TO_GROUND 
                   : this.cesium.HeightReference.RELATIVE_TO_GROUND,
-              disableDepthTestDistance: this.disableDepthTestDistance
+              disableDepthTestDistance: this.disableDepthTestDistance,
+              distanceDisplayCondition: this.distanceDisplayCondition ? 
+                  new this.cesium.DistanceDisplayCondition(this.distanceDisplayCondition.near, this.distanceDisplayCondition.far) : undefined,
+              scaleByDistance: this.scaleByDistance ? new this.cesium.NearFarScalar(
+                  this.scaleByDistance.near, 
+                  this.scaleByDistance.nearValue, 
+                  this.scaleByDistance.far, 
+                  this.scaleByDistance.farValue
+              ) : undefined,
+              translucencyByDistance: this.translucencyByDistance ? new this.cesium.NearFarScalar(
+                  this.translucencyByDistance.near, 
+                  this.translucencyByDistance.nearValue, 
+                  this.translucencyByDistance.far, 
+                  this.translucencyByDistance.farValue
+              ) : undefined
           }
       };
       
@@ -190,6 +216,7 @@ export class BaseEntity {
 
           // Update alignment and scale if metadata is available
           if (typeof result === 'object' && result.centerX !== undefined && this.entity && this.entity.billboard) {
+               this._canvasAnchor = { centerX: result.centerX, centerY: result.centerY };
                const s = this._canvasScale || 1;
                const userScale = (this.scale !== undefined && this.scale !== null) ? this.scale : 1.0;
                
@@ -204,9 +231,11 @@ export class BaseEntity {
                
                // Pixel offset needs to scale with the user's scale (visual size)
                // result.centerX/Y are in logical pixels.
+               const extraX = this.pixelOffset ? this.pixelOffset[0] : 0;
+               const extraY = this.pixelOffset ? this.pixelOffset[1] : 0;
                this.entity.billboard.pixelOffset = new this.cesium.Cartesian2(
-                   -result.centerX * userScale, 
-                   -result.centerY * userScale
+                   -result.centerX * userScale + extraX, 
+                   -result.centerY * userScale + extraY
                );
 
                // Sync scaleByDistance with pixelOffsetScaleByDistance
@@ -215,6 +244,9 @@ export class BaseEntity {
                    // Ensure pixelOffset scales exactly the same way as the image
                    this.entity.billboard.pixelOffsetScaleByDistance = this.entity.billboard.scaleByDistance;
                }
+               
+               // Notify change to ensure immediate re-render
+               this.trigger('change', this);
           }
       }).catch(e => {
           console.error('[CesiumFriendly] Failed to generate canvas', e);
@@ -222,9 +254,19 @@ export class BaseEntity {
       
       // Register with manager
       // We treat it as a billboard for management purposes
-      const ds = pointsManager.getDataSource('cesium-friendly-billboards');
       const e = ds.entities.add(combinedOptions);
       this.entity = e;
+      this._enableHeightCheck();
+      this._updateFinalVisibility();
+      this.update();
+      
+      if (Array.isArray(this._entityCollection)) {
+          for (const peer of this._entityCollection) {
+              if (peer !== this && peer.entity) {
+                  peer.entity.show = false;
+              }
+          }
+      }
       
       // Register this wrapper
       // We might need to trick the manager into thinking this is a billboard wrapper if it was a point wrapper
@@ -233,7 +275,7 @@ export class BaseEntity {
       // Or just leave it, as long as manager can remove it by ID.
       // Cleanup uses ID, so it should be fine.
       
-      pointsManager.registerEntity(this, { _reused: true });
+      canvasManager.registerComposite(this, { _reused: true });
       
       // Mark as mounted
       this._destroyed = false;
@@ -381,12 +423,7 @@ export class BaseEntity {
 
   // --- Update API ---
 
-  update(options, duration = 0) {
-    // Animation Hook
-    if (duration > 0) {
-       return this._animateUpdate(options || {}, duration);
-    }
-
+  update(options) {
     if (options && typeof options === 'object') {
         Object.keys(options).forEach(key => {
             const value = options[key];
@@ -414,6 +451,16 @@ export class BaseEntity {
                      this.position = value;
                  }
             }
+            else if (key === 'height' || key === 'heightOffset') {
+                 if (typeof this.setHeight === 'function') {
+                     this.setHeight(value);
+                 } else {
+                     this.heightOffset = value;
+                     if (this.heightOffset > 0 && this.heightReference === 'clampToGround') {
+                         this.heightReference = 'relativeToGround';
+                     }
+                 }
+            }
             // 4. Direct property set
             else {
                  this[key] = value;
@@ -423,217 +470,17 @@ export class BaseEntity {
             }
         });
     }
+
+    // Trigger Animation if pending
+    if (this._animPending) {
+       this._startAnimation();
+       // Return early to prevent applying final state immediately if we are animating from start
+       // However, since we already set the properties above (to target values), 
+       // if we don't revert them now, the next lines (trigger change) might show them.
+       // _startAnimation will revert them.
+    }
     
     this.trigger('change', this);
-    return this;
-  }
-
-  // --- Animation ---
-
-  /**
-   * 开启链式动画模式。
-   * 示例: entity.animate(2000).setColor('red').setPixelSize(20).update();
-   * @param {number} duration 动画时长 (ms)
-   * @returns {Proxy} 代理对象，拦截 set 方法并记录目标值，最后调用 update() 或 start() 触发动画
-   */
-  animate(duration = 1000) {
-    const pendingOptions = {};
-    const self = this;
-
-    return new Proxy(this, {
-      get(target, prop, receiver) {
-        // 1. Trigger methods
-        
-        // update(): Execute animation with pending options
-        if (prop === 'update') {
-            return () => {
-                return self.update(pendingOptions, duration);
-            };
-        }
-        
-        // Intercept lifecycle methods that support animation
-        if (prop === 'restoreState') {
-            return () => self.restoreState(duration);
-        }
-
-        // 2. 拦截 Setter
-        if (typeof prop === 'string' && prop.startsWith('set')) {
-            return (...args) => {
-                let key = prop.slice(3);
-                if (key.length > 0) {
-                    key = key.charAt(0).toLowerCase() + key.slice(1);
-                    
-                    // 处理特殊的多参数 Setter
-                    if (prop === 'setOutline') {
-                         if (args[0] !== undefined) pendingOptions.outline = args[0];
-                         if (args[1] !== undefined) pendingOptions.outlineColor = args[1];
-                         if (args[2] !== undefined) pendingOptions.outlineWidth = args[2];
-                    }
-                    else if (prop === 'setPixelOffset') {
-                        if (args.length >= 2) pendingOptions.pixelOffset = { x: args[0], y: args[1] };
-                        else pendingOptions.pixelOffset = args[0];
-                    }
-                    else if (prop === 'setEyeOffset') {
-                         if (args.length >= 3) pendingOptions.eyeOffset = { x: args[0], y: args[1], z: args[2] };
-                         else pendingOptions.eyeOffset = args[0];
-                    }
-                    // 默认单参数 Setter
-                    else {
-                        if (args.length > 0) pendingOptions[key] = args[0];
-                    }
-                }
-                return receiver; // 返回代理以支持链式调用
-            };
-        }
-
-        // 3. 透传其他属性/方法
-        const val = Reflect.get(target, prop, receiver);
-        if (typeof val === 'function') {
-             return val.bind(target);
-        }
-        return val;
-      }
-    });
-  }
-
-  _animateUpdate(targetOptions, duration) {
-    // 1. Identify animatable properties and their start/end values
-    const props = [];
-    const Cesium = this.cesium;
-    
-    // Stop any existing update animation
-    if (this._updateTimer) {
-        cancelAnimationFrame(this._updateTimer);
-        this._updateTimer = null;
-    }
-
-    Object.keys(targetOptions).forEach(key => {
-        const endVal = targetOptions[key];
-        // 如果 startVal 是 undefined，尝试从 options 中获取默认值
-        const startVal = this[key] !== undefined ? this[key] : (this.options[key]);
-
-        // Skip if values are same (shallow check)
-        if (endVal === startVal) return;
-        
-        // Skip special composed properties for now (billboard, label) unless we recurse
-        // We only animate direct properties on this entity
-        if (key === 'billboard' || key === 'label') return;
-
-        // A. Number Interpolation (opacity, scale, pixelSize, rotation, width, height, etc)
-        if (typeof endVal === 'number' && typeof startVal === 'number') {
-            props.push({
-                key,
-                type: 'number',
-                start: startVal,
-                end: endVal
-            });
-        }
-        // B. Color - DIRECT UPDATE (No Animation)
-        // User requested to remove color animation and just apply it instantly.
-        else if ((key.toLowerCase().includes('color')) && typeof endVal === 'string') {
-             // Treat as non-animatable value
-             props.push({
-                 key,
-                 type: 'value-immediate', // Mark as immediate update
-                 end: endVal
-             });
-        }
-        // C. Position Interpolation
-        else if (key === 'position' && Array.isArray(endVal) && Array.isArray(startVal)) {
-            // Assume [lng, lat, alt]
-            // We can interpolate linearly on these coordinates for short distances
-            // Or convert to Cartesian3, lerp, and convert back?
-            // Simple linear on [lng, lat, alt] is usually fine for local movements.
-            props.push({
-                key,
-                type: 'array',
-                start: [...startVal],
-                end: [...endVal]
-            });
-        }
-        // D. Non-animatable: Apply at end
-        else {
-            // We'll just apply these at the very end of the animation
-            props.push({
-                key,
-                type: 'value',
-                end: endVal
-            });
-        }
-    });
-
-    if (props.length === 0) return this;
-
-    // 2. Start Animation Loop
-    const startTime = performance.now();
-    
-    const animate = (now) => {
-        const elapsed = now - startTime;
-        let t = elapsed / duration;
-        
-        if (t >= 1) {
-            t = 1;
-        }
-
-        // Apply Easing? (Optional, Linear for now)
-        // t = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t; // EaseInOutQuad
-
-        const currentOptions = {};
-        
-        props.forEach(p => {
-            if (p.type === 'number') {
-                const val = p.start + (p.end - p.start) * t;
-                currentOptions[p.key] = val;
-            } 
-            else if (p.type === 'array') {
-                 const val = p.start.map((v, i) => {
-                     const e = p.end[i] !== undefined ? p.end[i] : v;
-                     return v + (e - v) * t;
-                 });
-                 currentOptions[p.key] = val;
-            }
-            // Apply value types (including color) immediately at start or end?
-            // If we wait for t===1, it snaps at the end.
-            // But for color, user might want immediate change. 
-            // However, inside an animation chain (e.g. animate(2000)), usually "value" props snap at the end.
-            // If user wants immediate color change, they should just call .setColor() directly without .animate().
-            // But if they call .animate().setColor(), they expect it to change as part of the transaction.
-            // Since we removed interpolation, "snapping at the end" (t===1) is the standard behavior for non-interpolated values in animation libraries.
-            // BUT, user said "directly change color", implying no transition.
-            // If I make it snap at t=0, it changes immediately when animation starts.
-            // Let's stick to t=1 (end of animation) to keep it consistent with the duration promise, 
-            // OR if user meant "don't animate color, just set it", they should probably not chain it if they want it NOW.
-            // Re-reading: "Color change frequency is too fast so it flashes... remove color from animation library, just change color directly".
-            // This implies when `animate().setColor()` is called, it shouldn't try to LERP.
-            // If we wait until t=1, it will just pop to the new color at the end.
-            // If we do it at t=0, it pops at start.
-            // I will make it apply at t=1 (end) so it respects the "wait" time of the animation, but doesn't flicker intermediate colors.
-            else if (p.type === 'value' && t === 1) {
-                  currentOptions[p.key] = p.end;
-             }
-             // Apply immediate values (like color) right at the start (first frame, t >= 0)
-             // We check !p.applied to ensure it's only applied once to save resources, 
-             // though setting it every frame is also fine but redundant.
-             else if (p.type === 'value-immediate' && !p.applied) {
-                 currentOptions[p.key] = p.end;
-                 p.applied = true; 
-             }
-        });
-
-        // Apply updates using existing update method (duration=0)
-        // We use the existing update logic so it handles setters, dirty checking, etc.
-        // This might trigger 'change' event many times.
-        this.update(currentOptions, 0);
-
-        if (t < 1) {
-            this._updateTimer = requestAnimationFrame(animate);
-        } else {
-            this._updateTimer = null;
-        }
-    };
-
-    this._updateTimer = requestAnimationFrame(animate);
-
     return this;
   }
 
@@ -686,6 +533,7 @@ export class BaseEntity {
     if (this._destroyed) return;
     this._destroyed = true;
 
+    this.stopAnimation();
     this._disableHeightCheck();
 
     if (this._flashTimer) {
@@ -737,6 +585,9 @@ export class BaseEntity {
 
   trigger(type, ...args) {
     const s = this._eventHandlers.get(type);
+    if (this._inUpdateAnimation && type === 'change') {
+      return;
+    }
     if (s) {
       for (const h of s) {
         try {
@@ -747,6 +598,19 @@ export class BaseEntity {
           }
         } catch (e) {
           console.error(`Error in event handler for ${type}:`, e);
+        }
+      }
+    }
+    if (this._asCanvas && Array.isArray(this._entityCollection)) {
+      if (type === 'click' || type === 'select' || type === 'unselect' || type === 'hover' || type === 'dragstart' || type === 'drag' || type === 'dragend') {
+        for (const peer of this._entityCollection) {
+          if (peer !== this && typeof peer.trigger === 'function') {
+            if (args && args.length > 0) {
+              peer.trigger(type, ...args);
+            } else {
+              peer.trigger(type, peer);
+            }
+          }
         }
       }
     }
@@ -844,6 +708,131 @@ export class BaseEntity {
 
     this._flashTimer = requestAnimationFrame(animateFlash);
 
+    return this;
+  }
+
+  // --- Animation ---
+
+  animate(duration = 1000, loop = false) {
+    this.saveState();
+    this._animContext = {
+      startValues: deepClone(this._savedState || {}),
+      duration: duration,
+      loop: loop,
+      direction: 1
+    };
+    this._animPending = true;
+    return this;
+  }
+
+  _startAnimation() {
+    if (!this._animContext) return;
+    
+    this._animPending = false;
+    this.stopAnimation();
+    
+    const startState = this._animContext.startValues || {};
+    this._animContext.startValues = startState;
+    
+    this.saveState();
+    const targetState = deepClone(this._savedState || {});
+    
+    // 2. Identify numeric targets
+    const targets = {};
+    
+    Object.keys(targetState).forEach(key => {
+        const s = startState[key];
+        const t = targetState[key];
+        // Capture everything that changed
+        if (s !== t) {
+            targets[key] = t;
+        }
+    });
+    
+    this._animContext.targets = targets;
+    
+    // 3. Reset to Start State
+    this._savedState = deepClone(startState);
+    this.restoreState(0);
+    
+    // 4. Start Animation Loop (RAF)
+    let startTime = null;
+    const duration = this._animContext.duration;
+    const legDuration = this._animContext.loop ? (duration / 2) : duration;
+    
+    // Cache keys to avoid garbage collection in loop
+    const targetKeys = Object.keys(targets);
+    // Reusable object for updates to reduce allocation
+    const current = {};
+
+    const animate = (now) => {
+        if (!this._animContext) return; // Guard against disposal
+
+        // Initialize startTime on first frame to ensure smooth start (elapsed = 0)
+        if (!startTime) startTime = now;
+
+        const elapsed = now - startTime;
+        let forward = true;
+        let linearT;
+        if (this._animContext.loop) {
+            const cycles = Math.floor(elapsed / legDuration);
+            forward = cycles % 2 === 0;
+            linearT = (elapsed % legDuration) / legDuration;
+        } else {
+            linearT = Math.min(elapsed / legDuration, 1);
+        }
+        this._animContext.direction = forward ? 1 : -1;
+        const t = linearT < 0.5 ? 2 * linearT * linearT : -1 + (4 - 2 * linearT) * linearT;
+        
+        targetKeys.forEach(key => {
+            const s = startState[key];
+            const e = targets[key];
+            
+            if (typeof s === 'number' && typeof e === 'number') {
+                 if (forward) {
+                     current[key] = s + (e - s) * t;
+                 } else {
+                     current[key] = e + (s - e) * t;
+                 }
+            } else {
+                 current[key] = forward ? e : s;
+            }
+        });
+        
+        this._inUpdateAnimation = true;
+        this.update(current);
+        this._inUpdateAnimation = false;
+        
+        // Ensure Cesium renders this frame
+        if (this.viewer && this.viewer.scene) {
+            this.viewer.scene.requestRender();
+        }
+
+        if ((linearT < 1 || this._animContext.loop) && this._animPending === false) {
+             this._animFrame = requestAnimationFrame(animate);
+        } else {
+             this._animFrame = null;
+             this._inUpdateAnimation = false;
+             // Ensure final state is exactly target if not looping
+             if (!this._animContext.loop) {
+                 this.update(targets);
+             }
+        }
+    };
+    
+    this._animFrame = requestAnimationFrame(animate);
+  }
+
+  stopAnimation() {
+    if (this._animFrame) {
+        cancelAnimationFrame(this._animFrame);
+        this._animFrame = null;
+    }
+    // Also clear interval if it existed from previous version (just in case)
+    if (this._animInterval) {
+        clearInterval(this._animInterval);
+        this._animInterval = null;
+    }
     return this;
   }
 

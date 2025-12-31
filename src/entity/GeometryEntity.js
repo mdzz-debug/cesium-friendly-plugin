@@ -315,7 +315,11 @@ export class GeometryEntity extends BaseEntity {
 
       // Scale
       if (this.scale !== undefined) {
-         if (this.entity.billboard) this.entity.billboard.scale = this.scale;
+         if (this.entity.billboard) {
+             const sFactor = (this._asCanvas || this.isCanvas) ? (this._canvasScale || 1) : 1;
+             const effective = (this.scale !== undefined && this.scale !== null ? this.scale : 1.0) / sFactor;
+             this.entity.billboard.scale = effective;
+         }
          if (this.entity.label) this.entity.label.scale = this.scale;
          if (this.entity.point && this.pixelSize !== undefined) {
              this.entity.point.pixelSize = this.pixelSize * this.scale;
@@ -327,6 +331,15 @@ export class GeometryEntity extends BaseEntity {
           const po = new Cesium.Cartesian2(this.pixelOffset[0], this.pixelOffset[1]);
           if (this.entity.billboard) this.entity.billboard.pixelOffset = po;
           if (this.entity.label) this.entity.label.pixelOffset = po;
+      }
+      if ((this._asCanvas || this.isCanvas) && this.entity && this.entity.billboard && this._canvasAnchor) {
+          const userScale = (this.scale !== undefined && this.scale !== null) ? this.scale : 1.0;
+          const extraX = this.pixelOffset ? this.pixelOffset[0] : 0;
+          const extraY = this.pixelOffset ? this.pixelOffset[1] : 0;
+          this.entity.billboard.pixelOffset = new Cesium.Cartesian2(
+              -this._canvasAnchor.centerX * userScale + extraX,
+              -this._canvasAnchor.centerY * userScale + extraY
+          );
       }
 
       // Eye Offset

@@ -1,5 +1,6 @@
 import pluginInstance from './core/instance.js';
 import pointsManager from './core/manager.js';
+import canvasManager from './core/canvasManager.js';
 import debuggerManager from './debugger/index.js';
 import flyManager from './earth/fly.js';
 import { createEntityApi } from './entity/index.js';
@@ -26,6 +27,7 @@ pluginInstance.init = function(cesium, viewer, options = {}) {
 
   this._viewer = rawViewer;
   pointsManager.init(cesium, rawViewer);
+  canvasManager.init(cesium, rawViewer);
   flyManager.init(cesium, rawViewer);
   
   if (options && options.debug) {

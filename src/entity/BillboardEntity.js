@@ -166,12 +166,16 @@ export class BillboardEntity extends GeometryEntity {
   _applyBillboardStyles() {
       if (this.entity && this.entity.billboard) {
           const Cesium = this.cesium;
-          this.entity.billboard.image = this.imageUrl;
+          if (!this._asCanvas && !this.isCanvas) {
+            this.entity.billboard.image = this.imageUrl;
+          }
           this.entity.billboard.rotation = Cesium.Math.toRadians(this.rotation);
           this.entity.billboard.color = Cesium.Color.fromCssColorString(this.color).withAlpha(this.opacity);
-          this.entity.billboard.width = this.width;
-          this.entity.billboard.height = this.height;
-          this.entity.billboard.sizeInMeters = this.sizeInMeters;
+          if (!this._asCanvas && !this.isCanvas) {
+            this.entity.billboard.width = this.width;
+            this.entity.billboard.height = this.height;
+            this.entity.billboard.sizeInMeters = this.sizeInMeters;
+          }
       }
   }
 

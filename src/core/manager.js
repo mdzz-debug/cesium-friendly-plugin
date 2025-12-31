@@ -605,7 +605,7 @@ class PointsManager {
     
     // 3. If still not removed, scan known CustomDataSources (Brute force cleanup)
     if (!removed) {
-        const dataSources = ['cesium-friendly-points', 'cesium-friendly-billboards', 'cesium-friendly-labels'];
+        const dataSources = ['cesium-friendly-points', 'cesium-friendly-billboards', 'cesium-friendly-labels', 'cesium-friendly-canvas'];
             for (const dsName of dataSources) {
                  const dsList = this.viewer.dataSources.getByName(dsName);
                  // Check ALL data sources with this name (in case duplicates were created)
@@ -723,7 +723,7 @@ class PointsManager {
             }
             
             // Clear Custom DataSources
-            const dsNames = ['cesium-friendly-points', 'cesium-friendly-billboards', 'cesium-friendly-labels'];
+            const dsNames = ['cesium-friendly-points', 'cesium-friendly-billboards', 'cesium-friendly-labels', 'cesium-friendly-canvas'];
             dsNames.forEach(name => {
                 const dsList = this.viewer.dataSources.getByName(name);
                 dsList.forEach(ds => {
