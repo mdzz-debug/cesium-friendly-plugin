@@ -4,8 +4,29 @@ import { PointEntity as PointEntityClass } from './PointEntity.js';
 import { BillboardEntity as BillboardEntityClass } from './BillboardEntity.js';
 import { LabelEntity as LabelEntityClass } from './LabelEntity.js';
 import { SmartGeometryEntity as SmartGeometryEntityClass } from './SmartGeometryEntity.js';
+import { CircleEntity as CircleEntityClass } from './CircleEntity.js';
+import { CylinderEntity as CylinderEntityClass } from './CylinderEntity.js';
+import { ConeEntity as ConeEntityClass } from './ConeEntity.js';
+import { BoxEntity as BoxEntityClass } from './BoxEntity.js';
+import { RectangleEntity as RectangleEntityClass } from './RectangleEntity.js';
+import { PathEntity as PathEntityClass } from './PathEntity.js';
 import { EntityGroup } from './EntityGroup.js';
 import pointsManager from '../core/manager.js';
+
+// Ensure Subclasses are registered on SmartGeometryEntity (explicit)
+SmartGeometryEntityClass.Types.circle = CircleEntityClass;
+SmartGeometryEntityClass.Types.ellipse = CircleEntityClass;
+SmartGeometryEntityClass.Types.sphere = CircleEntityClass;
+SmartGeometryEntityClass.Types.ellipsoid = CircleEntityClass;
+SmartGeometryEntityClass.Types.cylinder = CylinderEntityClass;
+SmartGeometryEntityClass.Types.cone = ConeEntityClass;
+SmartGeometryEntityClass.Types.box = BoxEntityClass;
+SmartGeometryEntityClass.Types.rectangle = RectangleEntityClass;
+SmartGeometryEntityClass.Types.polyline = PathEntityClass;
+SmartGeometryEntityClass.Types.corridor = PathEntityClass;
+SmartGeometryEntityClass.Types.wall = PathEntityClass;
+SmartGeometryEntityClass.Types.polylinevolume = PathEntityClass;
+SmartGeometryEntityClass.Types.polylineVolume = PathEntityClass;
 
 function generateUUID() {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
@@ -72,6 +93,15 @@ export function createEntityApi(pluginInstance) {
           }
           
           const id = generateUUID();
+          
+          // Dynamic class selection for Geometry (e.g. CircleEntity, CylinderEntity, etc.)
+          if (type === 'geometry' && options && options.kind) {
+              if (SmartGeometryEntityClass.Types && SmartGeometryEntityClass.Types[options.kind]) {
+                  const Cls = SmartGeometryEntityClass.Types[options.kind];
+                  return new Cls(id, viewer, cesium, options);
+              }
+          }
+          
           return new EntityClass(id, viewer, cesium, options);
       };
 
@@ -170,4 +200,4 @@ BaseEntity.Types = {
     LabelEntity: LabelEntityClass
 };
 
-export { BaseEntity, GeometryEntity, PointEntityClass as PointEntity, BillboardEntityClass as BillboardEntity, LabelEntityClass as LabelEntity, SmartGeometryEntityClass as SmartGeometryEntity, EntityGroup };
+export { BaseEntity, GeometryEntity, PointEntityClass as PointEntity, BillboardEntityClass as BillboardEntity, LabelEntityClass as LabelEntity, SmartGeometryEntityClass as SmartGeometryEntity, CircleEntityClass as CircleEntity, CylinderEntityClass as CylinderEntity, ConeEntityClass as ConeEntity, BoxEntityClass as BoxEntity, RectangleEntityClass as RectangleEntity, PathEntityClass as PathEntity, EntityGroup };

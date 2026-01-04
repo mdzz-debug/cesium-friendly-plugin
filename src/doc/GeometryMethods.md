@@ -9,12 +9,12 @@
 - 线：polyline
 - 折线体：polylineVolume
 - 面：polygon
-- 圆/椭圆（2D）：circle、ellipse
+- 圆（含椭圆别名，2D/3D）：circle
 - 矩形：rectangle
 - 走廊：corridor
 - 盒子：box
 - 圆柱/圆锥：cylinder、cone
-- 球/椭球体（3D）：sphere、ellipsoid
+- 球/椭球体（3D）：circle（3D 模式，等价于 sphere/ellipsoid）
 - 墙：wall
 
 ## 基本用法
@@ -53,8 +53,8 @@ circle.sectorQuarter(0).update();
 // 特殊角度扇形：从 15° 开始，扫过 135°
 circle.sector(15, 135).update();
 
-// 椭圆（2D）
-circle.shape('ellipse').semiAxes(400000, 250000).rotationDeg(30).update();
+// 椭圆（2D，ellipse 为 circle 的别名）
+circle.shape('circle').semiAxes(400000, 250000).rotationDeg(30).update();
 
 // 球（3D）
 circle.shape('circle').mode('3d').radius(300000).update();
@@ -68,7 +68,7 @@ circle
 
 // 用法二：对象参数（支持 maximumCone/vertical）
 circle
-  .shape('ellipse').mode('3d').radii(300000, 300000, 300000)
+  .shape('circle').mode('3d').radii(300000, 300000, 300000)
   .sectorDeg({ start: 0, sweep: 360, maximumCone: 60 }) // 60° 球冠
   .update();
 ```
@@ -127,27 +127,27 @@ cf.geometry({})
   .add();
 ```
 
-## 椭球/球体
+## 椭球/球体（circle 3D 模式）
 
 ```js
-// 球体
+// 球体（3D 模式下的 circle）
 cf.geometry({ position: [107, 40, 300000] })
-  .shape('sphere')
+  .shape('circle').mode('3d')
   .radius(300000)
   .material('red')
   .outline(true, '#000', 1)
   .add();
 
-// 椭球体
+// 椭球体（3D 模式下的 circle）
 cf.geometry({ position: [114, 40, 300000] })
-  .shape('ellipsoid')
+  .shape('circle').mode('3d')
   .radii(200000, 200000, 300000)
   .material('blue')
   .add();
 
 // 椭球体 + 垂直角切割（maximumCone）
 cf.geometry({ position: [114, 40, 300000] })
-  .shape('ellipsoid')
+  .shape('circle').mode('3d')
   .radii(300000, 300000, 300000)
   .sectorDeg({ start: 0, sweep: 120, vertical: 75 }) // 水平扇区 + 垂直切割
   .material('purple')
@@ -202,7 +202,7 @@ cf.geometry({})
 ```js
 cf.geometry({ position: [100, 30, 0] })
   .shape('box')
-  .dim(100000, 50000, 50000)
+  .dimensions(100000, 50000, 50000)
   .material('orange')
   .add();
 ```
@@ -233,20 +233,31 @@ wall.rotationDeg(90, 'X').update();
 wall.rotationDeg(30, 'Y').update();
 ```
 
+提示：
+- 若未显式设置轴向，rotationDeg 默认等价于 rotationDeg(0, 'X')
+- 椭圆（ellipse）在 2D 模式同样支持 rotationDeg 旋转与动画
+- 往复/循环动画会保持用户设置的旋转轴，不会在收缩阶段切换
+
 ## 动画支持
-`animate` 方法支持几何属性（如角度、半径、高度偏移）的往复运动。
-支持的属性包括：rotationAngle, heightOffset, radiusValue, semiMajorAxis 等。
+使用 animate(duration, options?) 定义动画上下文，再用 update({ 属性: 目标值 }) 启动动画。
+支持 loop（往返）、repeat（重复）与 easing（easeInOut/linear/easeIn/easeOut）。
 
 ```js
 // 让几何体旋转起来
 const entity = cf.geometry({ position: [100, 40, 0] })
-  .shape('box').dim(100000, 50000, 50000)
+  .shape('box').dimensions(100000, 50000, 50000)
   .material('blue')
   .add();
 
-// 开启往复动画：属性名, 起始值, 结束值, 持续时间(ms)
-entity.animate('rotationAngle', 0, Math.PI * 2, 5000); 
+// 往复动画：持续 5 秒，A→B→A
+entity.animate(5000, { loop: true });
+entity.update({ rotationAngle: Math.PI * 2 });
 
-// 也可以指定轴向（需先设定）
-entity.rotation(0, 'X').animate('rotationAngle', 0, Math.PI * 2, 5000);
+// 椭圆绕 Z 轴连续旋转（保留用户轴向设置）
+const ellipse = cf.geometry({ position: [111, 40, 200000] })
+  .shape('ellipse').semiAxes(400000, 250000)
+  .rotationDeg(0, 'Z')
+  .add();
+ellipse.animate(6000, { loop: true });
+ellipse.update({ rotationAngle: Math.PI * 2 });
 ```

@@ -1,165 +1,197 @@
-<!--********************************************************************
-* by jiawanlong
-*********************************************************************-->
 <!DOCTYPE html>
-<html>
-
+<html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
-  <link rel="stylesheet" href="./../../libs/cesium/Cesium1.98/Widgets/widgets.css">
-  <script type="text/javascript" src="./../../libs/cesium/Cesium1.98/Cesium.js"></script>
+  <title>Cesium 扇形动画（仅外圆弧轮廓）</title>
+  <link
+    rel="stylesheet"
+    href="https://cdn.jsdelivr.net/npm/cesium@1.136/Build/Cesium/Widgets/widgets.css"
+  />
+  <script src="https://cdn.jsdelivr.net/npm/cesium@1.136/Build/Cesium/Cesium.js"></script>
+  <style>
+    html, body, #cesiumContainer {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+    }
+  </style>
 </head>
+<body>
+<div id="cesiumContainer"></div>
 
-<body style="margin: 0; overflow: hidden; background: #fff; width: 100%; height: 100%; position: absolute; top: 0">
-  <div id="map" style="margin: 0 auto; width: 100%; height: 100%"></div>
-  <script type="text/javascript">
+<script>
+  /*************************
+   * 1️⃣ Viewer 初始化
+   *************************/
+  const viewer = new Cesium.Viewer('cesiumContainer', {
+    timeline: false,
+    animation: false,
+    geocoder: false,
+    homeButton: false,
+    sceneModePicker: false,
+    baseLayerPicker: false,
+    navigationHelpButton: false,
+    terrainProvider: undefined
+  });
 
-    const viewer = new Cesium.Viewer('map', {
-                  imageryProvider: false,
-            baseLayerPicker: false,
-      geocoder: false,
-      homeButton: false,
-      sceneModePicker: false,
-      baseLayerPicker: false,
-      navigationHelpButton: false,
-      animation: false,
-      timeline: false,
-      fullscreenButton: false,
-      creditContainer: document.createElement("div")
-    });
-      var xyz = new Cesium.UrlTemplateImageryProvider({
-            "url": '//data.mars3d.cn/tile/img/{z}/{x}/{y}.jpg'
-        })
-        viewer.imageryLayers.addImageryProvider(xyz)
-    // 开启帧率
-    viewer.scene.debugShowFramesPerSecond = true;
+  /*************************
+   * 2️⃣ 参数配置
+   *************************/
+  const config = {
+    centerLng: 116.404,
+    centerLat: 39.915,
+    radius: 3000,                 // 米
+    startAngle: 0,                // 起始角度（弧度）
+    initAngle: Math.PI * 2,       // 初始整圆
+    targetAngle: Math.PI,         // 半圆
+    angleStep: 0.02,              // 动画步长
+    delay: 1500,
+    fillColor: Cesium.Color.RED.withAlpha(0.5),
+    outlineColor: Cesium.Color.BLACK,
+    outlineWidth: 2
+  };
 
+  let currentAngle = config.initAngle;
+  let running = false;
 
-    class TrackMatte {
-      constructor(val) {
-        this.viewer = val.viewer;
-        this.id = val.id;
-        this.shortwaveRange = val.shortwaveRange;
-        this.longitude = val.position[0],
-          this.latitude = val.position[1],
-          this.position = Cesium.Cartesian3.fromDegrees(
-            val.position[0],
-            val.position[1],
-          );
-        this.heading = 0;
-        this.positionArr = this.calcPoints(
-          val.position[0],
-          val.position[1],
-          val.shortwaveRange,
+  /*************************
+   * 3️⃣ 扇形 Polygon 点（填充用）
+   *************************/
+  function buildSectorPositions(lng, lat, radius, start, end) {
+    const positions = [];
+    const step = Cesium.Math.toRadians(2);
+    const metersPerDegree = 111000;
+
+    // 中心点
+    positions.push(
+      Cesium.Cartesian3.fromDegrees(lng, lat, 0)
+    );
+
+    for (let angle = start; angle <= end; angle += step) {
+      const dx = Math.cos(angle) * radius;
+      const dy = Math.sin(angle) * radius;
+
+      positions.push(
+        Cesium.Cartesian3.fromDegrees(
+          lng + dx / metersPerDegree,
+          lat + dy / metersPerDegree,
           0
-        ) //储存脏数据
-        this.addEntities()
-      }
-      addEntities() {
-        let entity = this.viewer.entities.add({
-          id: this.id,
-          position: this.position,
-          wall: {
-            positions: new Cesium.CallbackProperty(() => {
-              return Cesium.Cartesian3.fromDegreesArrayHeights(this.positionArr);
-            }, false),
-            material: new Cesium.Color.fromCssColorString("#00dcff82"),
-            distanceDisplayCondition: new Cesium.DistanceDisplayCondition(
-              0.0,
-              10.5e6
-            ),
-          },
-          ellipsoid: {
-            radii: new Cesium.Cartesian3(
-              this.shortwaveRange,
-              this.shortwaveRange,
-              this.shortwaveRange
-            ),
-            maximumCone: Cesium.Math.toRadians(90),
-            material: new Cesium.Color.fromCssColorString("#00dcff82"),
-            outline: true,
-            outlineColor: new Cesium.Color.fromCssColorString("#00dcff82"),
-            outlineWidth: 1,
-            distanceDisplayCondition: new Cesium.DistanceDisplayCondition(
-              0.0,
-              10.5e6
-            ),
-          },
-        });
-        this.addPostRender()
-      }
-      addPostRender() {
-        this.viewer.clock.onTick.addEventListener(() => {
-          this.heading += 10.0;//可调节转动速度
-          this.positionArr = this.calcPoints(
-            this.longitude,
-            this.latitude,
-            this.shortwaveRange,
-            this.heading
-          );
-        });
-      }
-      calcPoints(x1, y1, radius, heading) {
-
-
-
-        var m = Cesium.Transforms.eastNorthUpToFixedFrame(
-          Cesium.Cartesian3.fromDegrees(x1, y1)
-        );
-        var rx = radius * Math.cos((heading * Math.PI) / 180.0);
-        var ry = radius * Math.sin((heading * Math.PI) / 180.0);
-        var translation = Cesium.Cartesian3.fromElements(rx, ry, 0);
-        var d = Cesium.Matrix4.multiplyByPoint(
-          m,
-          translation,
-          new Cesium.Cartesian3()
-        );
-        var c = Cesium.Cartographic.fromCartesian(d);
-        var x2 = Cesium.Math.toDegrees(c.longitude);
-        var y2 = Cesium.Math.toDegrees(c.latitude);
-        return this.computeCirclularFlight(x1, y1, x2, y2, 0, 90);
-      }
-      computeCirclularFlight(x1, y1, x2, y2, fx, angle) {
-
-
-
-        let positionArr = [];
-        positionArr.push(x1);
-        positionArr.push(y1);
-        positionArr.push(0);
-        var radius = Cesium.Cartesian3.distance(
-          Cesium.Cartesian3.fromDegrees(x1, y1),
-          Cesium.Cartesian3.fromDegrees(x2, y2)
-        );
-        for (let i = fx; i <= fx + angle; i++) {
-
-
-
-          let h = radius * Math.sin((i * Math.PI) / 180.0);
-          let r = Math.cos((i * Math.PI) / 180.0);
-          let x = (x2 - x1) * r + x1;
-          let y = (y2 - y1) * r + y1;
-          positionArr.push(x);
-          positionArr.push(y);
-          positionArr.push(h);
-        }
-        return positionArr;
-      }
-
+        )
+      );
     }
 
+    return positions;
+  }
 
-    let trackMatte = new TrackMatte({
-      viewer: viewer,
-      id: 1,
-      shortwaveRange: 100000.0,
-      position: [-75, 39],
-    })
+  /*************************
+   * 4️⃣ 外圆弧 Polyline 点（轮廓用）
+   *************************/
+  function buildArcPositions(lng, lat, radius, start, end) {
+    const positions = [];
+    const step = Cesium.Math.toRadians(2);
+    const metersPerDegree = 111000;
 
-    viewer.camera.setView({
-      destination: Cesium.Cartesian3.fromDegrees(-75, 39, 700000.0)
-    });
-  </script>
+    for (let angle = start; angle <= end; angle += step) {
+      const dx = Math.cos(angle) * radius;
+      const dy = Math.sin(angle) * radius;
+
+      positions.push(
+        Cesium.Cartesian3.fromDegrees(
+          lng + dx / metersPerDegree,
+          lat + dy / metersPerDegree,
+          0
+        )
+      );
+    }
+
+    return positions;
+  }
+
+  /*************************
+   * 5️⃣ 填充扇形（Polygon）
+   *************************/
+  const sectorEntity = viewer.entities.add({
+    polygon: {
+      hierarchy: new Cesium.CallbackProperty(() => {
+        return new Cesium.PolygonHierarchy(
+          buildSectorPositions(
+            config.centerLng,
+            config.centerLat,
+            config.radius,
+            config.startAngle,
+            currentAngle
+          )
+        );
+      }, false),
+      material: config.fillColor,
+      outline: false,
+      height: 10,
+      heightReference: Cesium.HeightReference.CLAMP_TO_GROUND
+    }
+  });
+
+  /*************************
+   * 6️⃣ 外圈轮廓（Polyline）
+   *************************/
+  const arcOutline = viewer.entities.add({
+    polyline: {
+      positions: new Cesium.CallbackProperty(() => {
+        return buildArcPositions(
+          config.centerLng,
+          config.centerLat,
+          config.radius,
+          config.startAngle,
+          currentAngle
+        );
+      }, false),
+      width: config.outlineWidth,
+      material: config.outlineColor,
+      clampToGround: true
+    }
+  });
+
+  /*************************
+   * 7️⃣ 动画逻辑
+   *************************/
+  function tick() {
+    if (!running) return;
+
+    if (currentAngle > config.targetAngle) {
+      currentAngle = Math.max(
+        currentAngle - config.angleStep,
+        config.targetAngle
+      );
+
+      console.log(
+        '当前角度：',
+        (currentAngle * 180 / Math.PI).toFixed(1) + '°'
+      );
+    } else {
+      running = false;
+      viewer.clock.onTick.removeEventListener(tick);
+      console.log('✅ 动画完成');
+    }
+  }
+
+  /*************************
+   * 8️⃣ 启动流程
+   *************************/
+  viewer.zoomTo(
+    sectorEntity,
+    new Cesium.HeadingPitchRange(
+      0,
+      -0.5,
+      config.radius * 3
+    )
+  ).then(() => {
+    setTimeout(() => {
+      running = true;
+      viewer.clock.onTick.addEventListener(tick);
+      console.log('🎬 动画开始');
+    }, config.delay);
+  });
+</script>
 </body>
-
 </html>

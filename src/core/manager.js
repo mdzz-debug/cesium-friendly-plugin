@@ -579,6 +579,27 @@ class PointsManager {
     } else {
       return false;
     }
+    // Stop running animations and timers on the wrapper before removal
+    if (point) {
+      try {
+        if (typeof point.stopAnimation === 'function') {
+          point.stopAnimation();
+        }
+        if (point._flashTimer) {
+          cancelAnimationFrame(point._flashTimer);
+          point._flashTimer = null;
+        }
+        if (point._updateTimer) {
+          cancelAnimationFrame(point._updateTimer);
+          point._updateTimer = null;
+        }
+        if (typeof point._disableHeightCheck === 'function') {
+          point._disableHeightCheck();
+        }
+        point._animPending = false;
+        point._inUpdateAnimation = false;
+      } catch (_) {}
+    }
     
     // 无论是否取到 point 对象，都尝试移除 viewer 中的实体
     // Updated logic: Check all possible locations (Viewer.entities + Custom DataSources)
@@ -697,17 +718,27 @@ class PointsManager {
         
         // 1. Cleanup all wrappers (timers, events) manually to avoid loop overhead
         this.points.forEach(point => {
-             // Stop lifecycle
+             if (!point) return;
+             // Stop animations and timers first to avoid RAF/update collisions
+             try {
+               if (typeof point.stopAnimation === 'function') point.stopAnimation();
+               if (point._flashTimer) { cancelAnimationFrame(point._flashTimer); point._flashTimer = null; }
+               if (point._updateTimer) { cancelAnimationFrame(point._updateTimer); point._updateTimer = null; }
+               if (typeof point._disableHeightCheck === 'function') point._disableHeightCheck();
+               point._animPending = false;
+               point._inUpdateAnimation = false;
+             } catch (_) {}
+             
+             // Stop lifecycle TTL
              if (this.ttlTimers.has(point.id)) {
                  clearTimeout(this.ttlTimers.get(point.id));
+                 this.ttlTimers.delete(point.id);
              }
              
              // Mark as destroyed so they don't try to remove themselves
-             if (point) {
-                 point._destroyed = true;
-                 point.entity = null;
-                 if (point._eventHandlers) point._eventHandlers.clear();
-             }
+             point._destroyed = true;
+             point.entity = null;
+             if (point._eventHandlers) point._eventHandlers.clear();
         });
         
         // 2. Clear collections
@@ -804,6 +835,18 @@ class PointsManager {
   }
 
   removeDuplicatesAtPosition(position, groupName, excludeIdOrIds) {
+    // Guard: skip duplicate removal for placeholder positions (e.g., [0,0] or near-zero)
+    try {
+      if (Array.isArray(position) && position.length >= 2) {
+        const lng = Number(position[0]) || 0;
+        const lat = Number(position[1]) || 0;
+        const epsilonZero = 1e-8;
+        if (Math.abs(lng) <= epsilonZero && Math.abs(lat) <= epsilonZero) {
+          return 0;
+        }
+      }
+    } catch (_) {}
+    
     const found = this.findEntitiesAtPosition(position);
     let count = 0;
     const newGroup = groupName || null;
@@ -823,6 +866,15 @@ class PointsManager {
       
       const sameGroup = (p.group || null) === newGroup;
       if (sameGroup) {
+        // Stop running animations before removal to avoid RAF conflicts
+        try {
+          if (typeof p.stopAnimation === 'function') {
+            p.stopAnimation();
+          }
+          // Clear pending flags if any
+          if (p._animPending) p._animPending = false;
+          if (p._inUpdateAnimation) p._inUpdateAnimation = false;
+        } catch (_) {}
         if (this.removeEntity(p)) count++;
       }
     }
@@ -870,6 +922,18 @@ class PointsManager {
     for (const id of Array.from(ids)) {
       const point = this.points.get(id);
       if (type && point && point.type !== type) continue;
+      
+      // Stop animations before removal to avoid RAF/update conflicts
+      if (point) {
+        try {
+          if (typeof point.stopAnimation === 'function') point.stopAnimation();
+          if (point._flashTimer) { cancelAnimationFrame(point._flashTimer); point._flashTimer = null; }
+          if (point._updateTimer) { cancelAnimationFrame(point._updateTimer); point._updateTimer = null; }
+          if (typeof point._disableHeightCheck === 'function') point._disableHeightCheck();
+          point._animPending = false;
+          point._inUpdateAnimation = false;
+        } catch (_) {}
+      }
       
       if (this.removeEntity(id)) count++;
     }

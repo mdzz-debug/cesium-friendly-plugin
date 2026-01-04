@@ -2,6 +2,8 @@ import { GeometryEntity } from './GeometryEntity.js';
 import { deepClone } from '../utils/deepClone.js';
 
 export class SmartGeometryEntity extends GeometryEntity {
+  static Types = {};
+
   constructor(id, viewer, cesium, options = {}) {
     super(id, viewer, cesium, options);
     this.type = 'geometry';
@@ -15,6 +17,8 @@ export class SmartGeometryEntity extends GeometryEntity {
     this._outlineColor = o.outlineColor;
     this._outlineWidth = o.outlineWidth || 1;
     this.rotationAngle = o.rotation || 0;
+    this._spinAngle = 0;
+    this._spinAxis = 'Z';
     this.extrudedHeight = o.extrudedHeight;
     this.radiusValue = o.radius || 1000;
     this.semiMajorAxis = o.semiMajorAxis;
@@ -36,7 +40,8 @@ export class SmartGeometryEntity extends GeometryEntity {
     this.rectangleCoordinates = o.rectangleCoordinates;
     this.polygonHierarchyData = o.polygonHierarchy || o.hierarchy;
     this.wallPositionsData = o.wallPositions;
-    this.rotationAxis = o.rotationAxis || 'Z';
+    this.rotationAxis = o.rotationAxis ?? this._computeDefaultAxis();
+    this._rotationAxisLine = o.rotationAxisLine;
     this.sectorStartAngle = o.sectorStartAngle;
     this.sectorSweepAngle = o.sectorSweepAngle;
     this.sectorVerticalAngle = o.sectorVerticalAngle;
@@ -47,9 +52,130 @@ export class SmartGeometryEntity extends GeometryEntity {
     return this.viewer.entities;
   }
 
-  shape(k) { this.kind = k; this.trigger('change', this); return this; }
+  saveState() {
+    const props = [
+      'kind', 'modeDim', '_material', 'materialOpacity', 'fill', 
+      '_outlineEnabled', '_outlineColor', '_outlineWidth', 
+      'rotationAngle', 'rotationAxis', '_rotationAxisLine', '_spinAngle', '_spinAxis', 'extrudedHeight', 
+      'radiusValue', 'semiMajorAxis', 'semiMinorAxis', 
+      'radiiX', 'radiiY', 'radiiZ', 
+      'lengthValue', 'topRadiusValue', 'bottomRadiusValue', 
+      'dimX', 'dimY', 'dimZ', 
+      'polylinePositionsData', 'polylineWidth', 
+      'volumeShapeData', 'corridorPositionsData', 'corridorWidth', 
+      'rectangleCoordinates', 'polygonHierarchyData', 'wallPositionsData', 
+      'sectorStartAngle', 'sectorSweepAngle', 'sectorVerticalAngle', 'sectorSamples',
+      'heightOffset', 'heightReference',
+      'group', 'name', 'description', 'minDisplayHeight', 'maxDisplayHeight',
+      'position', 'scale', 'pixelOffset', 'eyeOffset', 'horizontalOrigin', 'verticalOrigin',
+      'distanceDisplayCondition', 'scaleByDistance', 'translucencyByDistance', 'pixelOffsetScaleByDistance', 'disableDepthTestDistance'
+    ];
+    
+    this._savedState = {};
+    props.forEach(k => {
+        if (this[k] !== undefined) {
+            const v = this[k];
+            if (Array.isArray(v)) this._savedState[k] = [...v];
+            else if (v && typeof v === 'object' && v.constructor === Object) this._savedState[k] = deepClone(v);
+            else this._savedState[k] = v;
+        }
+    });
+    return this;
+  }
+
+  restoreState() {
+    if (!this._savedState) return this;
+    Object.keys(this._savedState).forEach(k => {
+        this[k] = this._savedState[k];
+    });
+    return this;
+  }
+
+  copyFrom(other) {
+    if (!other) return;
+    // Copy all properties that are not functions or internal private fields if needed
+    // We mainly care about the configuration properties
+    const keys = [
+      'kind', 'modeDim', '_material', 'materialOpacity', 'fill', 
+      '_outlineEnabled', '_outlineColor', '_outlineWidth', 
+      'rotationAngle', 'rotationAxis', '_rotationAxisLine', '_spinAngle', '_spinAxis', 'extrudedHeight', 
+      'radiusValue', 'semiMajorAxis', 'semiMinorAxis', 
+      'radiiX', 'radiiY', 'radiiZ', 
+      'lengthValue', 'topRadiusValue', 'bottomRadiusValue', 
+      'dimX', 'dimY', 'dimZ', 
+      'polylinePositionsData', 'polylineWidth', 
+      'volumeShapeData', 'corridorPositionsData', 'corridorWidth', 
+      'rectangleCoordinates', 'polygonHierarchyData', 'wallPositionsData', 
+      'sectorStartAngle', 'sectorSweepAngle', 'sectorVerticalAngle', 'sectorSamples',
+      'heightOffset', 'heightReference',
+      // BaseEntity properties
+      'group', 'name', 'description', 'minDisplayHeight', 'maxDisplayHeight'
+    ];
+    keys.forEach(k => {
+      if (other[k] !== undefined) this[k] = other[k];
+    });
+    // Copy options too
+    if (other.options) this.options = deepClone(other.options);
+    // Copy position
+    if (other.position) this.position = [...other.position];
+    // Copy animation context
+    if (other._animContext) this._animContext = deepClone(other._animContext);
+  }
+
+  shape(k) { 
+    this.kind = k; 
+    
+    // Check if we need to switch class
+    if (SmartGeometryEntity.Types[k]) {
+       const TargetClass = SmartGeometryEntity.Types[k];
+       // If current instance is already of TargetClass, do nothing
+       if (!(this instanceof TargetClass)) {
+          const newInstance = new TargetClass(this.id, this.viewer, this.cesium, this.options);
+          newInstance.copyFrom(this);
+          // Return new instance
+          // Note: The user reference 'const a = ...' won't change, 
+          // so this only works if chained: cf.geometry().shape('circle').add()
+          return newInstance;
+       }
+    }
+    
+    this.trigger('change', this); 
+    return this; 
+  }
   mode(m) { this.modeDim = m; this.trigger('change', this); return this; }
-  radius(r) { this.radiusValue = r; this.trigger('change', this); return this; }
+  mode2d() { this.modeDim = '2d'; this.trigger('change', this); return this; }
+  mode3d() { this.modeDim = '3d'; this.trigger('change', this); return this; }
+  radius(r) { 
+    const r2 = arguments.length > 1 ? arguments[1] : undefined;
+    if (Array.isArray(r) && r.length >= 2) {
+      this.semiMajorAxis = r[0];
+      this.semiMinorAxis = r[1];
+      this.radiiX = r[0];
+      this.radiiY = r[1];
+    } else if (typeof r === 'number' && typeof r2 === 'number') {
+      this.semiMajorAxis = r;
+      this.semiMinorAxis = r2;
+      this.radiiX = r;
+      this.radiiY = r2;
+    } else if (typeof r === 'object' && r !== null) {
+      const a = r.x ?? r.major ?? r.a;
+      const b = r.y ?? r.minor ?? r.b;
+      if (typeof a === 'number' && typeof b === 'number') {
+        this.semiMajorAxis = a;
+        this.semiMinorAxis = b;
+        this.radiiX = a;
+        this.radiiY = b;
+      } else if (typeof r.z === 'number') {
+        this.radiusValue = r.z;
+      } else {
+        this.radiusValue = r.value ?? this.radiusValue;
+      }
+    } else {
+      this.radiusValue = r;
+    }
+    this.trigger('change', this); 
+    return this; 
+  }
   radii(x, y, z) { this.radiiX = x; this.radiiY = y; this.radiiZ = z; this.trigger('change', this); return this; }
   semiAxes(major, minor) { this.semiMajorAxis = major; this.semiMinorAxis = minor; this.trigger('change', this); return this; }
   rotation(angle, axis) { 
@@ -64,6 +190,17 @@ export class SmartGeometryEntity extends GeometryEntity {
     this.trigger('change', this); 
     return this; 
   }
+  spinDeg(deg, axis = 'Z') { 
+    this._spinAngle = (deg || 0) * Math.PI / 180; 
+    this._spinAxis = axis.toUpperCase(); 
+    
+    if (this._animPending) {
+      this._startGeometryAnimation();
+    }
+
+    this.trigger('change', this); 
+    return this; 
+  }
   extrude(h) { this.extrudedHeight = h; this.trigger('change', this); return this; }
   material(m) { this._material = m; this.trigger('change', this); return this; }
   setOpacity(a) { this.materialOpacity = a; this.trigger('change', this); return this; }
@@ -72,6 +209,7 @@ export class SmartGeometryEntity extends GeometryEntity {
   topRadius(r) { this.topRadiusValue = r; this.trigger('change', this); return this; }
   bottomRadius(r) { this.bottomRadiusValue = r; this.trigger('change', this); return this; }
   dimensions(x, y, z) { this.dimX = x; this.dimY = y; this.dimZ = z; this.trigger('change', this); return this; }
+  dim(x, y, z) { return this.dimensions(x, y, z); }
   polylinePositions(p) { this.polylinePositionsData = p; this.trigger('change', this); return this; }
   volumeShape(s) { this.volumeShapeData = s; this.trigger('change', this); return this; }
   corridorPositions(p) { this.corridorPositionsData = p; this.trigger('change', this); return this; }
@@ -135,6 +273,7 @@ export class SmartGeometryEntity extends GeometryEntity {
     this.stopAnimation();
     
     const startState = this._animContext.startValues || {};
+    if (this.rotationAxis !== undefined) startState.rotationAxis = this.rotationAxis;
     this._animContext.startValues = startState;
     
     this.saveState();
@@ -151,12 +290,23 @@ export class SmartGeometryEntity extends GeometryEntity {
     
     this._animContext.targets = targets;
     
+    // If there are no targets (start equals end), skip starting animation to avoid side effects
+    if (Object.keys(targets).length === 0) {
+        this._animPending = false;
+        return this;
+    }
+    
+    
+    
     this._savedState = deepClone(startState);
     this.restoreState(0);
     
     let startTime = null;
     const duration = this._animContext.duration;
-    const legDuration = this._animContext.loop ? (duration / 2) : duration;
+    const isLoop = this._animContext.loop;
+    const isRepeat = this._animContext.repeat;
+    const easing = this._animContext.easing || 'easeInOut';
+    const legDuration = isLoop ? (duration / 2) : duration;
     
     const targetKeys = Object.keys(targets);
     const current = {};
@@ -169,26 +319,97 @@ export class SmartGeometryEntity extends GeometryEntity {
         const elapsed = now - startTime;
         let forward = true;
         let linearT;
-        if (this._animContext.loop) {
+        
+        if (isLoop) {
             const cycles = Math.floor(elapsed / legDuration);
             forward = cycles % 2 === 0;
+            linearT = (elapsed % legDuration) / legDuration;
+        } else if (isRepeat) {
+            forward = true;
             linearT = (elapsed % legDuration) / legDuration;
         } else {
             linearT = Math.min(elapsed / legDuration, 1);
         }
         this._animContext.direction = forward ? 1 : -1;
-        const t = linearT < 0.5 ? 2 * linearT * linearT : -1 + (4 - 2 * linearT) * linearT;
         
+        let t = linearT;
+        if (easing === 'easeInOut') {
+            t = linearT < 0.5 ? 2 * linearT * linearT : -1 + (4 - 2 * linearT) * linearT;
+        } else if (easing === 'linear') {
+            t = linearT;
+        } else if (easing === 'easeIn') {
+            t = linearT * linearT;
+        } else if (easing === 'easeOut') {
+            t = linearT * (2 - linearT);
+        }
+        
+        const cycles = Math.floor(elapsed / legDuration);
         targetKeys.forEach(key => {
             const s = startState[key];
             const e = targets[key];
             
             if (typeof s === 'number' && typeof e === 'number') {
-                 if (forward) {
+                 if (isRepeat && (key === 'rotationAngle' || key === '_spinAngle')) {
+                     current[key] = s + (e - s) * (cycles + t);
+                 } else if (forward) {
                      current[key] = s + (e - s) * t;
                  } else {
                      current[key] = e + (s - e) * t;
                  }
+            } else if (Array.isArray(s) && Array.isArray(e) && s.length === e.length && key === 'position') {
+                 current[key] = s.map((v, i) => {
+                     if (typeof v === 'number' && typeof e[i] === 'number') {
+                         return forward ? (v + (e[i] - v) * t) : (e[i] + (v - e[i]) * t);
+                     }
+                     return forward ? e[i] : v;
+                 });
+            } else if (Array.isArray(s) && Array.isArray(e) && s.length === e.length && key === 'wallPositionsData') {
+                 current[key] = s.map((sv, i) => {
+                     const ev = e[i];
+                     if (Array.isArray(sv) && Array.isArray(ev) && sv.length === ev.length) {
+                         return sv.map((v, j) => {
+                             const ej = ev[j];
+                             if (typeof v === 'number' && typeof ej === 'number') {
+                                 return forward ? (v + (ej - v) * t) : (ej + (v - ej) * t);
+                             }
+                             return forward ? ej : v;
+                         });
+                     }
+                     return forward ? ev : sv;
+                 });
+            } else if (Array.isArray(s) && Array.isArray(e) && s.length === e.length && key === 'corridorPositionsData') {
+                 // Support both nested [[lng,lat,(h)], ...] and flat [lng,lat,lng,lat,...] arrays
+                 if (typeof s[0] === 'number' && typeof e[0] === 'number') {
+                     current[key] = s.map((v, i) => {
+                         const ei = e[i];
+                         if (typeof v === 'number' && typeof ei === 'number') {
+                             return forward ? (v + (ei - v) * t) : (ei + (v - ei) * t);
+                         }
+                         return forward ? ei : v;
+                     });
+                 } else {
+                     current[key] = s.map((sv, i) => {
+                         const ev = e[i];
+                         if (Array.isArray(sv) && Array.isArray(ev) && sv.length === ev.length) {
+                             return sv.map((v, j) => {
+                                 const ej = ev[j];
+                                 if (typeof v === 'number' && typeof ej === 'number') {
+                                     return forward ? (v + (ej - v) * t) : (ej + (v - ej) * t);
+                                 }
+                                 return forward ? ej : v;
+                             });
+                         }
+                         return forward ? ev : sv;
+                     });
+                 }
+            } else if (Array.isArray(s) && Array.isArray(e) && s.length === e.length && key === 'rectangleCoordinates') {
+                 current[key] = s.map((v, i) => {
+                     const ei = e[i];
+                     if (typeof v === 'number' && typeof ei === 'number') {
+                         return forward ? (v + (ei - v) * t) : (ei + (v - ei) * t);
+                     }
+                     return forward ? ei : v;
+                 });
             } else {
                  current[key] = forward ? e : s;
             }
@@ -216,13 +437,15 @@ export class SmartGeometryEntity extends GeometryEntity {
         if (this.viewer && this.viewer.scene) {
             this.viewer.scene.requestRender();
         }
+        
+        
 
-        if ((linearT < 1 || this._animContext.loop) && this._animPending === false) {
+        if ((linearT < 1 || isLoop || isRepeat) && this._animPending === false) {
              this._animFrame = requestAnimationFrame(animate);
         } else {
              this._animFrame = null;
              this._inUpdateAnimation = false;
-             if (!this._animContext.loop) {
+             if (!isLoop && !isRepeat) {
                  this.update(targets);
              }
         }
@@ -247,171 +470,40 @@ export class SmartGeometryEntity extends GeometryEntity {
     const opts = { id: this.id, name: this.name, description: this.description };
     const kind = (this.kind || 'circle').toLowerCase();
     
-    // Check for 3D rotation intent (non-Z axis) for circles/ellipses
-    const axis = (this.rotationAxis || 'Z').toUpperCase();
-    const is3DRotation = (kind === 'circle' || kind === 'ellipse') && (axis !== 'Z');
+    
+    // rotationAxisLine logic moved to _updateRotationAxisLine and called via _applySmartGeometry
 
-    if (kind === 'circle') {
-      if (this.modeDim === '3d' || is3DRotation) {
-        const r = this.radiusValue || 1000;
-        
-        // 3D sphere sector -> polygon wedge (extruded) or ellipsoid sector
-        // Or 3D rotated disk sector -> ellipsoid sector (wedge)
-        if (this.sectorVerticalAngle !== undefined || (this.sectorStartAngle !== undefined && this.sectorSweepAngle !== undefined)) {
-          const minClock = this.sectorStartAngle || 0;
-          const maxClock = (this.sectorStartAngle || 0) + (this.sectorSweepAngle || (2 * Math.PI));
-          opts.position = pos;
-          opts.ellipsoid = {
-            radii: new Cesium.Cartesian3(r, r, r),
-            material: mat,
-            fill: !!this.fill,
-            outline: !!this._outlineEnabled,
-            outlineColor: oc,
-            heightReference: this._getHeightReferenceEnum(),
-            minimumClock: minClock,
-            maximumClock: maxClock,
-            maximumCone: this.sectorVerticalAngle !== undefined ? this.sectorVerticalAngle : Math.PI
-           };
-           // If it's a disk (not 3D mode), we need flat Z
-           if (this.modeDim !== '3d') {
-               opts.ellipsoid.radii = new Cesium.Cartesian3(r, r, 0.1);
-               // For disk sector, we usually want the full cone (PI) or maybe half? 
-               // Standard ellipsoid sector uses clock for longitude (wedge).
-               // Cone controls latitude. For a disk (flat ellipsoid), cone doesn't matter much if flattened, 
-               // but strictly speaking 0-PI covers the whole sphere.
-           }
-           opts.orientation = this._getOrientation(pos);
-         } else {
-          // Standard Sphere or Disk
-          opts.position = pos;
-          opts.orientation = this._getOrientation(pos);
-          
-          let radii;
-          if (this.modeDim === '3d') {
-              // Sphere
-              radii = new Cesium.Cartesian3(r, r, r);
-          } else {
-              // 3D Rotated Disk (thin ellipsoid)
-              radii = new Cesium.Cartesian3(r, r, 0.1);
-          }
-          
-          opts.ellipsoid = { radii: radii, material: mat, fill: !!this.fill, outline: !!this._outlineEnabled, outlineColor: oc, heightReference: this._getHeightReferenceEnum() };
-        }
-      } else {
-        if (this.sectorStartAngle !== undefined && this.sectorSweepAngle !== undefined) {
-          const pts = this._computeSectorPositions(this.position, this.radiusValue || 1000, this.radiusValue || 1000, this.rotationAngle || 0, this.sectorStartAngle, this.sectorSweepAngle, this.sectorSamples, hh);
-          opts.polygon = { hierarchy: pts, material: mat, outline: !!this._outlineEnabled, outlineColor: oc, extrudedHeight: this.extrudedHeight, height: hh, heightReference: this._getHeightReferenceEnum() };
-        } else {
-          const r = this.radiusValue || 1000;
-          opts.position = pos;
-          opts.ellipse = { semiMajorAxis: r, semiMinorAxis: r, height: hh, material: mat, fill: this.fill, outline: !!this._outlineEnabled, outlineColor: oc, outlineWidth: this._outlineWidth, rotation: this.rotationAngle || 0, extrudedHeight: this.extrudedHeight };
-        }
+    
+    // Delegate to specialized sub-class if registered (e.g., CircleEntity)
+    if (SmartGeometryEntity.Types[kind]) {
+      const TargetClass = SmartGeometryEntity.Types[kind];
+      try {
+        const temp = new TargetClass(this.id, this.viewer, this.cesium, this.options);
+        temp.copyFrom(this);
+        return temp._createEntity();
+      } catch (_) {
+        // Fallback to base logic if delegation fails
       }
-    } else if (kind === 'ellipse') {
-      if (this.modeDim === '3d' || is3DRotation) {
-        const rx = this.radiiX || this.semiMajorAxis || this.radiusValue || 1000;
-        const ry = this.radiiY || this.semiMinorAxis || this.radiusValue || 1000;
-        let rz;
-        if (this.modeDim === '3d') {
-            rz = this.radiiZ || this.radiusValue || Math.max(rx, ry, 1000);
-        } else {
-            // Disk
-            rz = 0.1;
-        }
-
-        // 3D ellipsoid sector -> polygon wedge (extruded) or ellipsoid sector
-        if (this.sectorVerticalAngle !== undefined || (this.sectorStartAngle !== undefined && this.sectorSweepAngle !== undefined)) {
-          const minClock = this.sectorStartAngle || 0;
-          const maxClock = (this.sectorStartAngle || 0) + (this.sectorSweepAngle || (2 * Math.PI));
-          opts.position = pos;
-          opts.ellipsoid = {
-            radii: new Cesium.Cartesian3(rx, ry, rz),
-            material: mat,
-            fill: !!this.fill,
-            outline: !!this._outlineEnabled,
-            outlineColor: oc,
-            heightReference: this._getHeightReferenceEnum(),
-            minimumClock: minClock,
-            maximumClock: maxClock,
-            maximumCone: this.sectorVerticalAngle !== undefined ? this.sectorVerticalAngle : Math.PI
-           };
-           opts.orientation = this._getOrientation(pos);
-         } else {
-          opts.position = pos;
-          opts.orientation = this._getOrientation(pos);
-          opts.ellipsoid = { radii: new Cesium.Cartesian3(rx, ry, rz), material: mat, fill: !!this.fill, outline: !!this._outlineEnabled, outlineColor: oc, heightReference: this._getHeightReferenceEnum() };
-        }
-      } else {
-        if (this.sectorStartAngle !== undefined && this.sectorSweepAngle !== undefined) {
-          const a = this.semiMajorAxis || this.radiusValue || 1000;
-          const b = this.semiMinorAxis || this.radiusValue || 1000;
-          let pts = this._computeSectorPositions(this.position, a, b, 0, this.sectorStartAngle, this.sectorSweepAngle, this.sectorSamples, hh);
-          pts = this._rotatePositions(pts);
-          opts.polygon = { hierarchy: pts, material: mat, outline: !!this._outlineEnabled, outlineColor: oc, extrudedHeight: this.extrudedHeight, height: hh, heightReference: this._getHeightReferenceEnum() };
-        } else {
-          const a = this.semiMajorAxis || this.radiusValue || 1000;
-          const b = this.semiMinorAxis || this.radiusValue || 1000;
-          opts.position = pos;
-          opts.orientation = this._getOrientation(pos);
-          opts.ellipse = { semiMajorAxis: a, semiMinorAxis: b, height: hh, material: mat, fill: this.fill, outline: !!this._outlineEnabled, outlineColor: oc, outlineWidth: this._outlineWidth, extrudedHeight: this.extrudedHeight };
-        }
-      }
-    } else if (kind === 'sphere') {
-      const r = this.radiusValue || this.radiiX || 1000;
-      opts.position = pos;
-      opts.orientation = this._getOrientation(pos);
-      opts.ellipsoid = { radii: new Cesium.Cartesian3(r, r, r), material: mat, fill: !!this.fill, outline: !!this._outlineEnabled, outlineColor: oc, heightReference: this._getHeightReferenceEnum() };
-    } else if (kind === 'ellipsoid') {
-      const rx = this.radiiX || 1000;
-      const ry = this.radiiY || 1000;
-      const rz = this.radiiZ || 1000;
-      opts.position = pos;
-      opts.orientation = this._getOrientation(pos);
-      opts.ellipsoid = { radii: new Cesium.Cartesian3(rx, ry, rz), material: mat, fill: !!this.fill, outline: !!this._outlineEnabled, outlineColor: oc, heightReference: this._getHeightReferenceEnum() };
-    } else if (kind === 'polygon') {
+    }
+    
+    if (kind === 'polygon') {
       let ph = this._normalizeHierarchy(this.polygonHierarchyData);
       if (Array.isArray(ph)) ph = this._rotatePositions(ph);
       else if (ph && ph.positions) ph.positions = this._rotatePositions(ph.positions);
       opts.polygon = { hierarchy: ph, material: mat, outline: !!this._outlineEnabled, outlineColor: oc, extrudedHeight: this.extrudedHeight };
-    } else if (kind === 'polyline') {
-      let pp = this._normalizePositions(this.polylinePositionsData);
-      pp = this._rotatePositions(pp);
-      opts.polyline = { positions: pp, width: this.polylineWidth || 1, material: mat };
-    } else if (kind === 'polylinevolume' || kind === 'polylineVolume') {
-      let pv = this._normalizePositions(this.polylinePositionsData);
-      pv = this._rotatePositions(pv);
-      opts.polylineVolume = { positions: pv, shape: this._normalizeVolumeShape(this.volumeShapeData) || [], material: mat };
-    } else if (kind === 'rectangle') {
-      opts.rectangle = { coordinates: this._normalizeRectangle(this.rectangleCoordinates), material: mat, outline: !!this._outlineEnabled, outlineColor: oc, extrudedHeight: this.extrudedHeight };
-    } else if (kind === 'corridor') {
-      let cp = this._normalizePositions(this.corridorPositionsData);
-      cp = this._rotatePositions(cp);
-      opts.corridor = { positions: cp, width: this.corridorWidth || 1, material: mat, outline: !!this._outlineEnabled, outlineColor: oc };
-    } else if (kind === 'box') {
-      opts.position = pos;
-      opts.orientation = this._getOrientation(pos);
-      opts.box = { dimensions: new Cesium.Cartesian3(this.dimX || 1, this.dimY || 1, this.dimZ || 1), material: mat };
     } else if (kind === 'cylinder') {
       opts.position = pos;
-      opts.orientation = this._getOrientation(pos);
+      opts.orientation = this._getDynamicOrientation(pos);
       const r = this.radiusValue !== undefined ? this.radiusValue : 1;
       const tr = this.topRadiusValue !== undefined ? this.topRadiusValue : r;
       const br = this.bottomRadiusValue !== undefined ? this.bottomRadiusValue : r;
       opts.cylinder = { length: this.lengthValue || 1, topRadius: tr, bottomRadius: br, material: mat, outline: !!this._outlineEnabled, outlineColor: oc };
     } else if (kind === 'cone') {
       opts.position = pos;
-      opts.orientation = this._getOrientation(pos);
+      opts.orientation = this._getDynamicOrientation(pos);
       const tr = this.topRadiusValue !== undefined ? this.topRadiusValue : 0;
       const br = this.bottomRadiusValue !== undefined ? this.bottomRadiusValue : 1;
       opts.cylinder = { length: this.lengthValue || 1, topRadius: tr, bottomRadius: br, material: mat, outline: !!this._outlineEnabled, outlineColor: oc };
-    } else if (kind === 'wall') {
-      const CesiumRef = Cesium;
-      const posCb = new CesiumRef.CallbackProperty(() => {
-        let wp = this._normalizePositions(this.wallPositionsData, true);
-        wp = this._rotatePositions(wp);
-        return wp;
-      }, false);
-      opts.wall = { positions: posCb, material: mat };
     } else {
       opts.position = pos;
       opts.point = { pixelSize: 10, color: Cesium.Color.YELLOW, heightReference: this._getHeightReferenceEnum() };
@@ -425,169 +517,137 @@ export class SmartGeometryEntity extends GeometryEntity {
     return this;
   }
 
+  _computeDefaultAxis() {
+    return 'Z';
+  }
+
+  _updateDebugAxes() {
+    const Cesium = this.cesium;
+    const coll = this.viewer && this.viewer.entities;
+    if (!coll) {
+        console.warn('[SmartGeometryEntity] No entity collection found for debug axes');
+        return;
+    }
+
+    console.log('[SmartGeometryEntity] Updating Debug Axes for', this.id);
+
+    // We need 3 lines: X (Red), Y (Green), Z (Blue)
+    const axes = [
+        { id: `${this.id}__debugAxisX`, color: Cesium.Color.RED, vector: new Cesium.Cartesian3(1, 0, 0) },
+        { id: `${this.id}__debugAxisY`, color: Cesium.Color.GREEN, vector: new Cesium.Cartesian3(0, 1, 0) },
+        { id: `${this.id}__debugAxisZ`, color: Cesium.Color.BLUE, vector: new Cesium.Cartesian3(0, 0, 1) }
+    ];
+
+    // Define the callback function generator
+    const createUpdateCallback = (localVector, axisName) => (time) => {
+        if (!this.position || this.position.length < 2) return [];
+        
+        let center;
+        if (this.entity && this.entity.position) {
+           center = this.entity.position.getValue(time);
+        }
+        if (!center) {
+           const lng = this.position[0];
+           const lat = this.position[1];
+           const h = (this.position[2] || 0) + (this.heightOffset || 0);
+           center = Cesium.Cartesian3.fromDegrees(lng, lat, h);
+        }
+
+        // Debug log once per 60 frames (approx)
+        if (Math.random() < 0.01) {
+            // console.log(`[DebugAxis ${axisName}] Center:`, center);
+        }
+        
+        // 1. Get ENU frame (Fixed Frame)
+        const enu = Cesium.Transforms.eastNorthUpToFixedFrame(center);
+        const enuRot = Cesium.Matrix4.getMatrix3(enu, new Cesium.Matrix3());
+        
+        // 2. User requested: X/Y parallel to ground, Z perpendicular to ground.
+        // This corresponds to the ENU frame itself.
+        // We do NOT apply the entity's rotation to these axes, 
+        // because the user wants to see the reference frame, not the rotated local frame.
+        const finalRot = enuRot;
+
+        // 3. Calculate Direction
+        const dir = Cesium.Matrix3.multiplyByVector(finalRot, localVector, new Cesium.Cartesian3());
+        Cesium.Cartesian3.normalize(dir, dir);
+
+        // 4. Length (dynamic based on radius)
+        const len = Math.max(
+          (this.semiMajorAxis || this.radiusValue || 1000) || 1000, 
+          (this.semiMinorAxis || this.radiusValue || 1000) || 1000
+        ) * 1.5;
+
+        // Draw line from Center to Center + Vector * Length
+        // We use Center as start point to visualize the origin clearly
+        const end = Cesium.Cartesian3.add(center, Cesium.Cartesian3.multiplyByScalar(dir, len, new Cesium.Cartesian3()), new Cesium.Cartesian3());
+        return [center, end];
+    };
+
+    axes.forEach(axisDef => {
+        let axisEntity = coll.getById(axisDef.id);
+        const cb = new Cesium.CallbackProperty(createUpdateCallback(axisDef.vector, axisDef.id), false);
+        
+        if (!axisEntity) {
+            coll.add({
+                id: axisDef.id,
+                polyline: {
+                    positions: cb,
+                    width: 5,
+                    material: axisDef.color,
+                    clampToGround: false,
+                    depthFailMaterial: axisDef.color // Make sure it's visible even if occluded by terrain
+                }
+            });
+        } else {
+            axisEntity.polyline.positions = cb;
+            axisEntity.polyline.material = axisDef.color;
+            axisEntity.polyline.clampToGround = false;
+            axisEntity.polyline.depthFailMaterial = axisDef.color;
+        }
+    });
+  }
+
   _applySmartGeometry() {
     const Cesium = this.cesium;
     const e = this.entity;
     if (!e) return;
     this._updateEntityPosition();
+    this._updateDebugAxes();
     const kind = (this.kind || '').toLowerCase();
     const mat = this._resolveMaterial(this._material);
     const oc = this._resolveColor(this._outlineColor);
+    
+    // Delegate updates to specialized sub-class if registered (e.g., CircleEntity)
+    if (SmartGeometryEntity.Types[kind]) {
+      const TargetClass = SmartGeometryEntity.Types[kind];
+      // Prevent infinite recursion if we are already in the target class
+      if (!(this instanceof TargetClass)) {
+        try {
+            const temp = new TargetClass(this.id, this.viewer, this.cesium, this.options);
+            temp.copyFrom(this);
+            // We need to pass the real entity to the temp wrapper so it can operate on it
+            temp.entity = this.entity; 
+            temp._applySmartGeometry();
+            return;
+        } catch (err) {
+            console.error('[SmartGeometryEntity] Delegation failed:', err);
+        }
+      }
+    }
 
     // Apply native orientation for supported 3D shapes
-    const nativeOrientationShapes = ['box', 'cylinder', 'cone', 'ellipsoid', 'sphere'];
-    const axis = (this.rotationAxis || 'Z').toUpperCase();
-    const is3DRotation = (axis !== 'Z');
-    
-    // We treat circle/ellipse as 3D (Ellipsoid/Disk) if mode is 3d OR if 3D rotation is applied
-    const is3dEllipsoid = ((this.modeDim === '3d' || is3DRotation) && (kind === 'circle' || kind === 'ellipse'));
-    
-    if (nativeOrientationShapes.includes(kind) || is3dEllipsoid) {
+    const nativeOrientationShapes = ['box', 'cylinder', 'cone'];
+    if (nativeOrientationShapes.includes(kind)) {
        if (this.position && this.position.length >= 2) {
-          const center = Cesium.Cartesian3.fromDegrees(this.position[0], this.position[1], this.position[2] || 0);
-          const angle = this.rotationAngle || 0;
-          let hpr;
-          if (axis === 'X') {
-             hpr = new Cesium.HeadingPitchRoll(0, 0, angle);
-          } else if (axis === 'Y') {
-             hpr = new Cesium.HeadingPitchRoll(0, -angle, 0);
-          } else {
-             hpr = new Cesium.HeadingPitchRoll(angle, 0, 0);
+          // Optimization: avoid re-creating CallbackProperty if already set
+          if (!e.orientation || !(e.orientation instanceof Cesium.CallbackProperty)) {
+              const center = Cesium.Cartesian3.fromDegrees(this.position[0], this.position[1], this.position[2] || 0);
+              e.orientation = this._getDynamicOrientation(center);
           }
-          e.orientation = Cesium.Transforms.headingPitchRollQuaternion(center, hpr);
        }
     }
-
-    // 3D circle/ellipse with sector -> polygon wedge; otherwise -> ellipsoid
-    if (is3dEllipsoid) {
-      const hr = this._getHeightReferenceEnum();
-      const rx = kind === 'circle' ? (this.radiusValue || 1000) : (this.radiiX || this.semiMajorAxis || this.radiusValue || 1000);
-      const ry = kind === 'circle' ? (this.radiusValue || 1000) : (this.radiiY || this.semiMinorAxis || this.radiusValue || 1000);
-      let rz;
-      if (this.modeDim === '3d') {
-          rz = kind === 'circle' ? (this.radiusValue || 1000) : (this.radiiZ || this.radiusValue || Math.max(rx, ry, 1000));
-      } else {
-          rz = 0.1;
-      }
-      
-      const hh = this._effectiveHeight();
-      
-      if (this.sectorVerticalAngle !== undefined || (this.sectorStartAngle !== undefined && this.sectorSweepAngle !== undefined)) {
-        const minClock = this.sectorStartAngle || 0;
-        const maxClock = (this.sectorStartAngle || 0) + (this.sectorSweepAngle || (2 * Math.PI));
-        const maxCone = this.sectorVerticalAngle !== undefined ? this.sectorVerticalAngle : Math.PI;
-         
-         if (!e.ellipsoid) {
-          e.ellipsoid = new Cesium.EllipsoidGraphics({
-            radii: new Cesium.Cartesian3(rx, ry, rz),
-            material: mat,
-            fill: !!this.fill,
-            outline: !!this._outlineEnabled,
-            outlineColor: oc,
-            heightReference: hr,
-            minimumClock: minClock,
-            maximumClock: maxClock,
-            maximumCone: maxCone,
-            minimumCone: 0
-          });
-          e.ellipse = undefined;
-          e.polygon = undefined;
-        } else {
-          e.ellipsoid.radii = new Cesium.Cartesian3(rx, ry, rz);
-          if (mat) e.ellipsoid.material = mat;
-          e.ellipsoid.fill = !!this.fill;
-          e.ellipsoid.outline = !!this._outlineEnabled;
-          if (oc) e.ellipsoid.outlineColor = oc;
-          if (this._outlineWidth !== undefined) e.ellipsoid.outlineWidth = this._outlineWidth;
-          e.ellipsoid.heightReference = hr;
-          e.ellipsoid.minimumClock = minClock;
-          e.ellipsoid.maximumClock = maxClock;
-          e.ellipsoid.maximumCone = maxCone;
-          e.ellipsoid.minimumCone = 0;
-        }
-      } else {
-        if (!e.ellipsoid) {
-          e.ellipsoid = new Cesium.EllipsoidGraphics({
-            radii: new Cesium.Cartesian3(rx, ry, rz),
-            material: mat,
-            fill: !!this.fill,
-            outline: !!this._outlineEnabled,
-            outlineColor: oc,
-            heightReference: hr
-          });
-          e.ellipse = undefined;
-          e.polygon = undefined;
-        } else {
-          e.ellipsoid.radii = new Cesium.Cartesian3(rx, ry, rz);
-          if (mat) e.ellipsoid.material = mat;
-          e.ellipsoid.fill = !!this.fill;
-          e.ellipsoid.outline = !!this._outlineEnabled;
-          if (oc) e.ellipsoid.outlineColor = oc;
-          if (this._outlineWidth !== undefined) e.ellipsoid.outlineWidth = this._outlineWidth;
-          e.ellipsoid.heightReference = hr;
-          e.ellipsoid.minimumClock = 0;
-          e.ellipsoid.maximumClock = 2 * Math.PI;
-          e.ellipsoid.minimumCone = 0;
-          e.ellipsoid.maximumCone = Math.PI;
-        }
-      }
-      if (this.viewer && this.viewer.scene) this.viewer.scene.requestRender();
-      return;
-    }
-    // --- Circle/Ellipse: sector -> polygon conversion on-the-fly (2D only)
-    const isCircleOrEllipse = (kind === 'circle' || kind === 'ellipse') && this.modeDim !== '3d';
-    const hasSector = isCircleOrEllipse && (this.sectorStartAngle !== undefined && this.sectorSweepAngle !== undefined);
-    if (hasSector) {
-      const a = kind === 'circle' ? (this.radiusValue || 1000) : (this.semiMajorAxis || this.radiusValue || 1000);
-      const b = kind === 'circle' ? (this.radiusValue || 1000) : (this.semiMinorAxis || this.radiusValue || 1000);
-      const hh = this._effectiveHeight();
-      let pts = this._computeSectorPositions(this.position, a, b, 0, this.sectorStartAngle, this.sectorSweepAngle, this.sectorSamples, hh);
-      pts = this._rotatePositions(pts);
-      if (!e.polygon) {
-        e.polygon = new Cesium.PolygonGraphics({
-          hierarchy: pts,
-          material: mat,
-          outline: !!this._outlineEnabled,
-          outlineColor: oc,
-          extrudedHeight: this.extrudedHeight,
-          height: hh,
-          heightReference: this._getHeightReferenceEnum()
-        });
-        e.ellipse = undefined;
-      } else {
-        e.polygon.hierarchy = pts;
-        if (mat) e.polygon.material = mat;
-        e.polygon.outline = !!this._outlineEnabled;
-        if (oc) e.polygon.outlineColor = oc;
-        if (this.extrudedHeight !== undefined) e.polygon.extrudedHeight = this.extrudedHeight;
-        e.polygon.height = hh;
-        e.polygon.heightReference = this._getHeightReferenceEnum();
-      }
-      // ensure render
-      if (this.viewer && this.viewer.scene) this.viewer.scene.requestRender();
-      return;
-    }
-    // --- Ellipse graphics updates when not sector
-    if (e.ellipse) {
-      if (this.semiMajorAxis) e.ellipse.semiMajorAxis = this.semiMajorAxis;
-      if (this.semiMinorAxis) e.ellipse.semiMinorAxis = this.semiMinorAxis;
-      if (this.extrudedHeight !== undefined) e.ellipse.extrudedHeight = this.extrudedHeight;
-      if (this.rotationAngle !== undefined) e.ellipse.rotation = this.rotationAngle;
-      if (mat) e.ellipse.material = mat;
-      e.ellipse.fill = !!this.fill;
-      e.ellipse.outline = !!this._outlineEnabled;
-      if (oc) e.ellipse.outlineColor = oc;
-      if (this._outlineWidth !== undefined) e.ellipse.outlineWidth = this._outlineWidth;
-    }
-    if (e.ellipsoid) {
-      const rx = this.radiiX || (kind === 'sphere' ? (this.radiusValue || 1000) : undefined);
-      const ry = this.radiiY || (kind === 'sphere' ? (this.radiusValue || 1000) : undefined);
-      const rz = this.radiiZ || (kind === 'sphere' ? (this.radiusValue || 1000) : undefined);
-      if (rx && ry && rz) e.ellipsoid.radii = new Cesium.Cartesian3(rx, ry, rz);
-      if (mat) e.ellipsoid.material = mat;
-      e.ellipsoid.outline = !!this._outlineEnabled;
-      if (oc) e.ellipsoid.outlineColor = oc;
-    }
+    
     // Polygon updates (non-circle/ellipse sector usage)
     if (e.polygon) {
       if (this.sectorStartAngle !== undefined && this.sectorSweepAngle !== undefined && (kind === 'circle' || kind === 'ellipse')) {
@@ -597,7 +657,13 @@ export class SmartGeometryEntity extends GeometryEntity {
         const hh = isRelative ? (this.heightOffset || 0) : (this.position[2] || 0);
         let pts = this._computeSectorPositions(this.position, a, b, 0, this.sectorStartAngle, this.sectorSweepAngle, this.sectorSamples, hh);
         e.polygon.hierarchy = this._rotatePositions(pts);
-      } else if (this.polygonHierarchyData) {
+      if (this.rotationAngle && this.rotationAngle !== 0) {
+          e.polygon.perPositionHeight = true;
+          // Avoid conflict with height
+          e.polygon.heightReference = Cesium.HeightReference.NONE;
+          e.polygon.height = undefined;
+      }
+    } else if (this.polygonHierarchyData) {
         let h = this._normalizeHierarchy(this.polygonHierarchyData);
         // If it's simple positions, rotate them. If it's hierarchy, it's more complex.
         // For now support simple position array rotation or handle Hierarchy if needed.
@@ -607,49 +673,22 @@ export class SmartGeometryEntity extends GeometryEntity {
         } else if (h && h.positions) {
            h.positions = this._rotatePositions(h.positions);
            // Handle holes if needed?
-        }
-        e.polygon.hierarchy = h;
       }
-      if (this.extrudedHeight !== undefined) e.polygon.extrudedHeight = this.extrudedHeight;
+      e.polygon.hierarchy = h;
+      if (this.rotationAngle && this.rotationAngle !== 0) {
+          e.polygon.perPositionHeight = true;
+          // Avoid conflict with height
+          e.polygon.heightReference = Cesium.HeightReference.NONE;
+          e.polygon.height = undefined;
+      }
+    }
+    if (this.extrudedHeight !== undefined) e.polygon.extrudedHeight = this.extrudedHeight;
       if (mat) e.polygon.material = mat;
       e.polygon.outline = !!this._outlineEnabled;
       if (oc) e.polygon.outlineColor = oc;
       const hh2 = this._effectiveHeight();
       e.polygon.height = hh2;
       e.polygon.heightReference = this._getHeightReferenceEnum();
-    }
-    if (e.polyline) {
-      if (this.polylinePositionsData) {
-        let p = this._normalizePositions(this.polylinePositionsData);
-        p = this._rotatePositions(p);
-        e.polyline.positions = p;
-      }
-      if (this.polylineWidth) e.polyline.width = this.polylineWidth;
-      if (mat) e.polyline.material = mat;
-    }
-    if (e.polylineVolume) {
-      if (this.polylinePositionsData) e.polylineVolume.positions = this._normalizePositions(this.polylinePositionsData);
-      if (this.volumeShapeData) e.polylineVolume.shape = this._normalizeVolumeShape(this.volumeShapeData);
-      if (mat) e.polylineVolume.material = mat;
-    }
-    if (e.corridor) {
-      if (this.corridorPositionsData) e.corridor.positions = this._normalizePositions(this.corridorPositionsData);
-      if (this.corridorWidth) e.corridor.width = this.corridorWidth;
-      if (mat) e.corridor.material = mat;
-      e.corridor.outline = !!this._outlineEnabled;
-      if (oc) e.corridor.outlineColor = oc;
-    }
-    if (e.rectangle) {
-      if (this.rectangleCoordinates) e.rectangle.coordinates = this.rectangleCoordinates;
-      if (this.extrudedHeight !== undefined) e.rectangle.extrudedHeight = this.extrudedHeight;
-      if (mat) e.rectangle.material = mat;
-      e.rectangle.outline = !!this._outlineEnabled;
-      if (oc) e.rectangle.outlineColor = oc;
-    }
-    if (e.box) {
-      const dx = this.dimX || 1, dy = this.dimY || 1, dz = this.dimZ || 1;
-      e.box.dimensions = new Cesium.Cartesian3(dx, dy, dz);
-      if (mat) e.box.material = mat;
     }
     if (e.cylinder) {
       if (this.lengthValue) e.cylinder.length = this.lengthValue;
@@ -669,16 +708,31 @@ export class SmartGeometryEntity extends GeometryEntity {
       e.cylinder.outline = !!this._outlineEnabled;
       if (oc) e.cylinder.outlineColor = oc;
     }
-    if (e.wall) {
-      if (this.wallPositionsData) {
-        const CesiumRef = Cesium;
-        e.wall.positions = new CesiumRef.CallbackProperty(() => {
-          let wp = this._normalizePositions(this.wallPositionsData, true);
-          wp = this._rotatePositions(wp);
-          return wp;
-        }, false);
-      }
-      if (mat) e.wall.material = mat;
+    
+    if (e.ellipsoid) {
+       const a = this.semiMajorAxis || this.radiusValue || 1000;
+       const b = this.semiMinorAxis || this.radiusValue || 1000;
+       const c = (this.modeDim === '3d' ? Math.max(a, b) : 0.1);
+       e.ellipsoid.radii = new Cesium.Cartesian3(a, b, c);
+       
+       if (mat) e.ellipsoid.material = mat;
+       e.ellipsoid.outline = !!this._outlineEnabled;
+       if (oc) e.ellipsoid.outlineColor = oc;
+       
+       // Handle sector updates
+       if (this.sectorStartAngle !== undefined || this.sectorSweepAngle !== undefined || this.sectorVerticalAngle !== undefined) {
+           const axis = (this.rotationAxis || 'X').toUpperCase(); 
+           const sectorOffset = (axis === 'Y') ? Math.PI / 2 : 0;
+           const baseStart = this.sectorStartAngle || 0;
+           const minClock = baseStart + sectorOffset;
+           const maxClock = baseStart + (this.sectorSweepAngle || (2 * Math.PI)) + sectorOffset;
+           
+           e.ellipsoid.minimumClock = minClock;
+           e.ellipsoid.maximumClock = maxClock;
+           if (this.sectorVerticalAngle !== undefined) {
+               e.ellipsoid.maximumCone = this.sectorVerticalAngle;
+           }
+       }
     }
   }
 
@@ -721,19 +775,135 @@ export class SmartGeometryEntity extends GeometryEntity {
     return rotatedPositions;
   }
 
+  _getDynamicOrientation(pos) {
+    const Cesium = this.cesium;
+
+    return new Cesium.CallbackProperty(() => {
+      // 1️⃣ ENU 基准
+      const enuMat = Cesium.Transforms.eastNorthUpToFixedFrame(pos);
+      const enuRot = Cesium.Matrix4.getMatrix3(enuMat, new Cesium.Matrix3());
+      const qENU = Cesium.Quaternion.fromRotationMatrix(enuRot);
+
+      // 2️⃣ Base Rotation（姿态）
+      let qBase = Cesium.Quaternion.IDENTITY;
+      if (this.rotationAngle) {
+        qBase = this._axisAngleToQuat(this.rotationAxis, this.rotationAngle);
+      }
+
+      // 3️⃣ Spin Rotation（局部自转）
+      let qSpin = Cesium.Quaternion.IDENTITY;
+      if (this._spinAngle) {
+        qSpin = this._axisAngleToQuat(this._spinAxis, this._spinAngle);
+      }
+
+      // ⚠️ 顺序极其重要
+      // Local → Base → Spin → ENU
+      const qLocal = Cesium.Quaternion.multiply(
+        qSpin,
+        qBase,
+        new Cesium.Quaternion()
+      );
+
+      return Cesium.Quaternion.multiply(
+        qENU,
+        qLocal,
+        new Cesium.Quaternion()
+      );
+    }, false);
+  }
+
+  _axisAngleToQuat(axis, angle) {
+    const Cesium = this.cesium;
+    switch ((axis || 'Z').toUpperCase()) {
+      case 'X':
+        return Cesium.Quaternion.fromAxisAngle(Cesium.Cartesian3.UNIT_X, angle);
+      case 'Y':
+        return Cesium.Quaternion.fromAxisAngle(Cesium.Cartesian3.UNIT_Y, -angle);
+      case 'Z':
+      default:
+        return Cesium.Quaternion.fromAxisAngle(Cesium.Cartesian3.UNIT_Z, angle);
+    }
+  }
+
   _getOrientation(pos) {
     const Cesium = this.cesium;
-    const axis = (this.rotationAxis || 'Z').toUpperCase();
-    const angle = this.rotationAngle || 0;
-    // if (angle === 0) return undefined; // Let's return undefined if no rotation? 
-    // Actually Cesium entity.orientation default is undefined (aligned with frame).
-    // If we have rotation, we return quaternion.
+    
     if (pos) {
-        let hpr;
-        if (axis === 'X') hpr = new Cesium.HeadingPitchRoll(0, 0, angle);
-        else if (axis === 'Y') hpr = new Cesium.HeadingPitchRoll(0, -angle, 0);
-        else hpr = new Cesium.HeadingPitchRoll(angle, 0, 0);
-        return Cesium.Transforms.headingPitchRollQuaternion(pos, hpr);
+        let qBase = Cesium.Quaternion.IDENTITY;
+        let qAnim = Cesium.Quaternion.IDENTITY;
+
+        // Explicit Spin (New API)
+        if (this._spinAngle !== undefined) {
+            // 1. Base Posture (Static) from rotationDeg
+            const currentAxis = (this.rotationAxis || 'Z').toUpperCase();
+            const currentAngle = this.rotationAngle || 0;
+            
+            if (currentAxis === 'X') qBase = Cesium.Quaternion.fromAxisAngle(Cesium.Cartesian3.UNIT_X, currentAngle);
+            else if (currentAxis === 'Y') qBase = Cesium.Quaternion.fromAxisAngle(Cesium.Cartesian3.UNIT_Y, -currentAngle);
+            else qBase = Cesium.Quaternion.fromAxisAngle(Cesium.Cartesian3.UNIT_Z, currentAngle);
+
+            // 2. Animation Spin (Dynamic) from spinDeg
+            const spinAxis = (this._spinAxis || 'Z').toUpperCase();
+            const spinAngle = this._spinAngle || 0;
+            
+            if (spinAxis === 'X') qAnim = Cesium.Quaternion.fromAxisAngle(Cesium.Cartesian3.UNIT_X, spinAngle);
+            else if (spinAxis === 'Y') qAnim = Cesium.Quaternion.fromAxisAngle(Cesium.Cartesian3.UNIT_Y, -spinAngle);
+            else qAnim = Cesium.Quaternion.fromAxisAngle(Cesium.Cartesian3.UNIT_Z, spinAngle);
+            
+        } else {
+            // Legacy Inference Logic
+            // Current state (Animation target or Current static)
+            const currentAxis = (this.rotationAxis || 'Z').toUpperCase();
+            const currentAngle = this.rotationAngle || 0;
+            
+            // Determine Base State (Initial Posture)
+            const s = this._savedState || {};
+            const baseAxis = (s.rotationAxis !== undefined ? s.rotationAxis : (this.rotationAxis || 'Z')).toUpperCase();
+            const baseAngle = (s.rotationAngle !== undefined ? (s.rotationAngle || 0) : 0);
+
+            // 1. Calculate Base Quaternion (Posture)
+            if (baseAxis === 'X') {
+                 qBase = Cesium.Quaternion.fromAxisAngle(Cesium.Cartesian3.UNIT_X, baseAngle);
+            } else if (baseAxis === 'Y') {
+                 qBase = Cesium.Quaternion.fromAxisAngle(Cesium.Cartesian3.UNIT_Y, -baseAngle);
+            } else {
+                 qBase = Cesium.Quaternion.fromAxisAngle(Cesium.Cartesian3.UNIT_Z, baseAngle);
+            }
+
+            // 2. Calculate Animation Quaternion (Spin/Heading)
+            if (currentAxis === 'Z' && baseAxis !== 'Z') {
+                 // We are spinning around Z, on top of a non-Z base.
+                 let zAngle = currentAngle % (2 * Math.PI);
+                 if (zAngle < 0) zAngle += (2 * Math.PI);
+                 qAnim = Cesium.Quaternion.fromAxisAngle(Cesium.Cartesian3.UNIT_Z, zAngle);
+            } else if (currentAxis !== 'Z' && currentAxis === baseAxis) {
+                 // No complex composition, just single rotation
+                 if (currentAxis === 'X') qAnim = Cesium.Quaternion.fromAxisAngle(Cesium.Cartesian3.UNIT_X, currentAngle);
+                 else if (currentAxis === 'Y') qAnim = Cesium.Quaternion.fromAxisAngle(Cesium.Cartesian3.UNIT_Y, -currentAngle);
+                 else qAnim = Cesium.Quaternion.fromAxisAngle(Cesium.Cartesian3.UNIT_Z, currentAngle);
+                 
+                 qBase = Cesium.Quaternion.IDENTITY; 
+            } else {
+                 // Fallback
+                 if (currentAxis === 'X') qAnim = Cesium.Quaternion.fromAxisAngle(Cesium.Cartesian3.UNIT_X, currentAngle);
+                 else if (currentAxis === 'Y') qAnim = Cesium.Quaternion.fromAxisAngle(Cesium.Cartesian3.UNIT_Y, -currentAngle);
+                 else qAnim = Cesium.Quaternion.fromAxisAngle(Cesium.Cartesian3.UNIT_Z, currentAngle);
+                 qBase = Cesium.Quaternion.IDENTITY;
+            }
+        }
+
+        // 3. Convert Local Rotations to Reference Frame
+        const qCombinedLocal = Cesium.Quaternion.multiply(qAnim, qBase, new Cesium.Quaternion());
+        
+        // 4. Apply to ENU Frame
+        const enu = Cesium.Transforms.eastNorthUpToFixedFrame(pos);
+        const enuRot = Cesium.Matrix4.getMatrix3(enu, new Cesium.Matrix3());
+        const qEnu = Cesium.Quaternion.fromRotationMatrix(enuRot);
+        
+        // Final = qEnu * qCombinedLocal
+        const qFinal = Cesium.Quaternion.multiply(qEnu, qCombinedLocal, new Cesium.Quaternion());
+        
+        return qFinal;
     }
     return undefined;
   }
@@ -922,47 +1092,92 @@ export class SmartGeometryEntity extends GeometryEntity {
   _updateEntityPosition() {
     if (!this.entity) return;
     const Cesium = this.cesium;
+    
+    // Check if we should switch to CallbackProperty for position to support smooth updates
+    // Use CallbackProperty if not already using it
+    if (!(this.entity.position instanceof Cesium.CallbackProperty)) {
+        this.entity.position = new Cesium.CallbackProperty(() => {
+            const lng = this.position[0];
+            const lat = this.position[1];
+            const isRelative = this.heightReference === 'relativeToGround';
+            const isClamp = this.heightReference === 'clampToGround';
+            
+            // Use cached terrain height if available
+            let terrainH = this._terrainHeight || 0;
+            if (terrainH === 0) {
+                 // Try sync cache
+                 terrainH = this._getGroundHeight(lng, lat);
+                 if (terrainH !== 0) this._terrainHeight = terrainH;
+            }
+            
+            let h;
+            if (isClamp) {
+              h = terrainH;
+            } else if (isRelative) {
+              h = terrainH + (this.heightOffset || 0);
+            } else {
+              h = (this.position[2] || 0) + (this.heightOffset || 0);
+            }
+            return Cesium.Cartesian3.fromDegrees(lng, lat, h);
+        }, false);
+    }
+    
+    this._updateHeightReference();
+    
+    // Trigger async terrain sampling if needed
     const lng = this.position[0];
     const lat = this.position[1];
     const isRelative = this.heightReference === 'relativeToGround';
     const isClamp = this.heightReference === 'clampToGround';
-    let terrainH = this._getGroundHeight(lng, lat);
-    let h;
-    if (isClamp) {
-      h = terrainH;
-    } else if (isRelative) {
-      h = terrainH + (this.heightOffset || 0);
-    } else {
-      h = (this.position[2] || 0) + (this.heightOffset || 0);
-    }
-    this.entity.position = Cesium.Cartesian3.fromDegrees(lng, lat, h);
-    this._updateHeightReference();
-    // If terrain height not ready yet, try sampling most detailed asynchronously
-    if ((isClamp || isRelative) && terrainH === 0 && Cesium.sampleTerrainMostDetailed && this.viewer && this.viewer.terrainProvider) {
-      const carto = Cesium.Cartographic.fromDegrees(lng, lat);
-      Cesium.sampleTerrainMostDetailed(this.viewer.terrainProvider, [carto]).then((res) => {
-        const sampled = res && res[0] ? res[0].height : undefined;
-        if (sampled !== undefined && sampled !== null) {
-          terrainH = sampled;
-          const newH = isClamp ? terrainH : (terrainH + (this.heightOffset || 0));
-          this.entity.position = Cesium.Cartesian3.fromDegrees(lng, lat, newH);
-          this._updateHeightReference();
-          if (this.viewer && this.viewer.scene) this.viewer.scene.requestRender();
-        }
-      }).catch(() => {});
+    
+    // Reset cache if position changed significantly?
+    // For now, simple sampling
+    if ((isClamp || isRelative) && (!this._terrainHeight) && Cesium.sampleTerrainMostDetailed && this.viewer && this.viewer.terrainProvider) {
+       // Only sample if not already sampling
+       if (!this._samplingTerrain) {
+           this._samplingTerrain = true;
+           const carto = Cesium.Cartographic.fromDegrees(lng, lat);
+           Cesium.sampleTerrainMostDetailed(this.viewer.terrainProvider, [carto]).then((res) => {
+               this._samplingTerrain = false;
+               const sampled = res && res[0] ? res[0].height : undefined;
+               if (sampled !== undefined && sampled !== null) {
+                   this._terrainHeight = sampled;
+                   // Position Callback will pick this up automatically next frame
+                   if (this.viewer && this.viewer.scene) this.viewer.scene.requestRender();
+               }
+           }).catch(() => { this._samplingTerrain = false; });
+       }
     }
   }
 
   saveState() {
     this._savedState = {
+      position: this.position ? [...this.position] : undefined,
       radiusValue: this.radiusValue,
       semiMajorAxis: this.semiMajorAxis,
       semiMinorAxis: this.semiMinorAxis,
       radiiX: this.radiiX,
       radiiY: this.radiiY,
       radiiZ: this.radiiZ,
+      wallPositionsData: this.wallPositionsData ? deepClone(this.wallPositionsData) : undefined,
+      corridorPositionsData: this.corridorPositionsData ? deepClone(this.corridorPositionsData) : undefined,
+      corridorWidth: this.corridorWidth,
+      rectangleCoordinates: Array.isArray(this.rectangleCoordinates) 
+        ? deepClone(this.rectangleCoordinates) 
+        : (this.rectangleCoordinates && this.rectangleCoordinates.west !== undefined 
+            ? [this.rectangleCoordinates.west, this.rectangleCoordinates.south, this.rectangleCoordinates.east, this.rectangleCoordinates.north] 
+            : undefined),
+      dimX: this.dimX,
+      dimY: this.dimY,
+      dimZ: this.dimZ,
+      lengthValue: this.lengthValue,
+      topRadiusValue: this.topRadiusValue,
+      bottomRadiusValue: this.bottomRadiusValue,
       rotationAngle: this.rotationAngle,
       rotationAxis: this.rotationAxis,
+      _rotationAxisLine: this._rotationAxisLine,
+      _spinAngle: this._spinAngle,
+      _spinAxis: this._spinAxis,
       heightReference: this.heightReference,
       heightOffset: this.heightOffset,
       sectorStartAngle: this.sectorStartAngle,
@@ -979,14 +1194,28 @@ export class SmartGeometryEntity extends GeometryEntity {
 
   restoreState() {
     const s = this._savedState || {};
+    if (s.position !== undefined) this.position = [...s.position];
     if (s.radiusValue !== undefined) this.radiusValue = s.radiusValue;
     if (s.semiMajorAxis !== undefined) this.semiMajorAxis = s.semiMajorAxis;
     if (s.semiMinorAxis !== undefined) this.semiMinorAxis = s.semiMinorAxis;
     if (s.radiiX !== undefined) this.radiiX = s.radiiX;
     if (s.radiiY !== undefined) this.radiiY = s.radiiY;
     if (s.radiiZ !== undefined) this.radiiZ = s.radiiZ;
+    if (s.wallPositionsData !== undefined) this.wallPositionsData = deepClone(s.wallPositionsData);
+    if (s.corridorPositionsData !== undefined) this.corridorPositionsData = deepClone(s.corridorPositionsData);
+    if (s.corridorWidth !== undefined) this.corridorWidth = s.corridorWidth;
+    if (s.rectangleCoordinates !== undefined) this.rectangleCoordinates = deepClone(s.rectangleCoordinates);
+    if (s.dimX !== undefined) this.dimX = s.dimX;
+    if (s.dimY !== undefined) this.dimY = s.dimY;
+    if (s.dimZ !== undefined) this.dimZ = s.dimZ;
+    if (s.lengthValue !== undefined) this.lengthValue = s.lengthValue;
+    if (s.topRadiusValue !== undefined) this.topRadiusValue = s.topRadiusValue;
+    if (s.bottomRadiusValue !== undefined) this.bottomRadiusValue = s.bottomRadiusValue;
     if (s.rotationAngle !== undefined) this.rotationAngle = s.rotationAngle;
     if (s.rotationAxis !== undefined) this.rotationAxis = s.rotationAxis;
+    if (s._rotationAxisLine !== undefined) this._rotationAxisLine = s._rotationAxisLine;
+    if (s._spinAngle !== undefined) this._spinAngle = s._spinAngle;
+    if (s._spinAxis !== undefined) this._spinAxis = s._spinAxis;
     if (s.heightReference !== undefined) this.heightReference = s.heightReference;
     if (s.heightOffset !== undefined) this.heightOffset = s.heightOffset;
     if (s.sectorStartAngle !== undefined) this.sectorStartAngle = s.sectorStartAngle;
@@ -999,5 +1228,15 @@ export class SmartGeometryEntity extends GeometryEntity {
     if (s.materialOpacity !== undefined) this.materialOpacity = s.materialOpacity;
     this._applySmartGeometry();
     return this;
+  }
+
+  _computeDefaultAxis() {
+    const m = this.modeDim || '2d';
+    const k = (this.kind || '').toLowerCase();
+    if (m === '2d') return 'Z';
+    if (k === 'circle' || k === 'ellipse' || k === 'ellipsoid' || k === 'sphere') return 'Z';
+    if (k === 'rectangle' || k === 'polygon' || k === 'path') return 'Z';
+    if (k === 'cylinder' || k === 'cone' || k === 'box') return 'Z';
+    return 'Z';
   }
 }

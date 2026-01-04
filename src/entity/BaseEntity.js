@@ -291,6 +291,13 @@ export class BaseEntity {
         return;
     }
     
+    // Pre-clean duplicates at same position/group to avoid add failure,
+    // and ensure any running animations on duplicates are stopped first.
+    try {
+      const excludeIds = this._entityCollection ? this._entityCollection.map(e => e.id) : [this.id];
+      pointsManager.removeDuplicatesAtPosition(this.position, this.group, excludeIds);
+    } catch (_) {}
+    
     // Create the Cesium entity if not already created
     if (!this.entity) {
       const created = this._createEntity();
@@ -349,6 +356,10 @@ export class BaseEntity {
         }
     }
 
+    if (this._applySmartGeometry) {
+        this._applySmartGeometry();
+    }
+
     // Register with manager
     // Pass _reused flag so manager knows to skip destructive cleanup
     pointsManager.registerEntity(this, { ...this.options, _reused: reused }); 
@@ -360,6 +371,11 @@ export class BaseEntity {
 
     this._enableHeightCheck();
     this._updateFinalVisibility();
+
+    // Auto-restart animation if configured (e.g. after re-add)
+    if (this._animContext && !this._animFrame) {
+        this._startAnimation();
+    }
   }
 
   show() {
@@ -713,16 +729,82 @@ export class BaseEntity {
 
   // --- Animation ---
 
-  animate(duration = 1000, loop = false) {
-    this.saveState();
-    this._animContext = {
-      startValues: deepClone(this._savedState || {}),
-      duration: duration,
-      loop: loop,
-      direction: 1
-    };
-    this._animPending = true;
-    return this;
+  animate(arg1 = 1000, arg2 = false, arg3, arg4, arg5) {
+    // Overloads:
+    // - animate(duration, loopOrOptions)
+    // - animate(propName, start, end, duration, loopOrOptions)
+    if (typeof arg1 === 'string') {
+        // Legacy signature
+        const propName = arg1;
+        const start = arg2;
+        const end = arg3;
+        const duration = (typeof arg4 === 'number') ? arg4 : (arg4 && arg4.duration ? arg4.duration : 1000);
+        const loopOrOptions = (typeof arg4 === 'number') ? arg5 : arg4;
+        
+        let options = {};
+        if (typeof loopOrOptions === 'object') {
+            options = loopOrOptions || {};
+        } else {
+            options = { loop: !!loopOrOptions };
+        }
+        const isLoop = !!options.loop;
+        const isRepeat = !!options.repeat;
+        const easing = options.easing || 'easeInOut';
+        
+        // Build anim context directly from args
+        this._animContext = {
+          startValues: {},
+          duration,
+          loop: isLoop,
+          repeat: isRepeat,
+          easing,
+          direction: 1
+        };
+        // Set start and target
+        this._animContext.startValues[propName] = start;
+        this._animContext.targets = { [propName]: end };
+        
+        // Prepare and start immediately
+        this._animPending = false;
+        // Save base state for axis/other orientation compat
+        this.saveState();
+        this._savedState = deepClone(this._animContext.startValues);
+        this.restoreState(0);
+        
+        if (this.type === 'geometry' && typeof this._startGeometryAnimation === 'function') {
+          return this._startGeometryAnimation();
+        } else {
+          return this._startAnimation();
+        }
+    } else {
+        // New signature: animate(duration, loopOrOptions)
+        const duration = (typeof arg1 === 'number') ? arg1 : (arg1 && arg1.duration ? arg1.duration : 1000);
+        const loopOrOptions = (typeof arg1 === 'number') ? arg2 : arg1;
+        
+        this.saveState();
+        
+        let options = {};
+        if (typeof loopOrOptions === 'object') {
+            options = loopOrOptions || {};
+        } else {
+            options = { loop: !!loopOrOptions };
+        }
+        
+        const isLoop = !!options.loop;
+        const isRepeat = !!options.repeat;
+        const easing = options.easing || 'easeInOut';
+    
+        this._animContext = {
+          startValues: deepClone(this._savedState || {}),
+          duration: duration,
+          loop: isLoop,
+          repeat: isRepeat,
+          easing: easing,
+          direction: 1
+        };
+        this._animPending = true;
+        return this;
+    }
   }
 
   _startAnimation() {
@@ -735,6 +817,7 @@ export class BaseEntity {
     this.stopAnimation();
     
     const startState = this._animContext.startValues || {};
+    if (this.rotationAxis !== undefined) startState.rotationAxis = this.rotationAxis;
     this._animContext.startValues = startState;
     
     this.saveState();
@@ -761,7 +844,14 @@ export class BaseEntity {
     // 4. Start Animation Loop (RAF)
     let startTime = null;
     const duration = this._animContext.duration;
-    const legDuration = this._animContext.loop ? (duration / 2) : duration;
+    const isLoop = this._animContext.loop;
+    const isRepeat = this._animContext.repeat;
+    const easing = this._animContext.easing || 'easeInOut';
+    
+    // Leg duration logic:
+    // Loop (Yoyo): duration / 2 (so full A->B->A cycle is duration?) -> Matches original logic
+    // Repeat (Restart): duration (full A->B cycle)
+    const legDuration = isLoop ? (duration / 2) : duration;
     
     // Cache keys to avoid garbage collection in loop
     const targetKeys = Object.keys(targets);
@@ -777,22 +867,42 @@ export class BaseEntity {
         const elapsed = now - startTime;
         let forward = true;
         let linearT;
-        if (this._animContext.loop) {
+        
+        if (isLoop) {
             const cycles = Math.floor(elapsed / legDuration);
             forward = cycles % 2 === 0;
             linearT = (elapsed % legDuration) / legDuration;
+        } else if (isRepeat) {
+            // Restart loop: Always forward, resets to 0
+            forward = true;
+            linearT = (elapsed % legDuration) / legDuration;
         } else {
+            // Once
             linearT = Math.min(elapsed / legDuration, 1);
         }
+
         this._animContext.direction = forward ? 1 : -1;
-        const t = linearT < 0.5 ? 2 * linearT * linearT : -1 + (4 - 2 * linearT) * linearT;
         
+        let t = linearT;
+        if (easing === 'easeInOut') {
+            t = linearT < 0.5 ? 2 * linearT * linearT : -1 + (4 - 2 * linearT) * linearT;
+        } else if (easing === 'linear') {
+            t = linearT;
+        } else if (easing === 'easeIn') {
+            t = linearT * linearT;
+        } else if (easing === 'easeOut') {
+            t = linearT * (2 - linearT);
+        }
+
+        const cycles = Math.floor(elapsed / legDuration);
         targetKeys.forEach(key => {
             const s = startState[key];
             const e = targets[key];
             
             if (typeof s === 'number' && typeof e === 'number') {
-                 if (forward) {
+                 if (isRepeat && key === 'rotationAngle') {
+                     current[key] = s + (e - s) * (cycles + t);
+                 } else if (forward) {
                      current[key] = s + (e - s) * t;
                  } else {
                      current[key] = e + (s - e) * t;
@@ -811,13 +921,13 @@ export class BaseEntity {
             this.viewer.scene.requestRender();
         }
 
-        if ((linearT < 1 || this._animContext.loop) && this._animPending === false) {
+        if ((linearT < 1 || isLoop || isRepeat) && this._animPending === false) {
              this._animFrame = requestAnimationFrame(animate);
         } else {
              this._animFrame = null;
              this._inUpdateAnimation = false;
-             // Ensure final state is exactly target if not looping
-             if (!this._animContext.loop) {
+             // Ensure final state is exactly target if not looping/repeating
+             if (!isLoop && !isRepeat) {
                  this.update(targets);
              }
         }

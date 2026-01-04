@@ -37,6 +37,12 @@ export class GeometryEntity extends BaseEntity {
         pointsManager.removeDuplicatesAtPosition(this.position, this.group, this.id);
     }
     
+    // Retarget running animation for position when loop/repeat is active
+    if (this._animContext && !this._animPending && !this._inUpdateAnimation) {
+        if (!this._animContext.targets) this._animContext.targets = {};
+        this._animContext.targets.position = position;
+    }
+    
     // Position is special - user expects immediate update usually, 
     // but to strictly follow lifecycle, we should defer it?
     // However, _updateEntityPosition is used internally.

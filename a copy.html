@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>Cesium 能量球 Ball 示例</title>
+  <link
+    rel="stylesheet"
+    href="https://cdn.jsdelivr.net/npm/cesium@1.136/Build/Cesium/Widgets/widgets.css"
+  />
+  <script src="https://cdn.jsdelivr.net/npm/cesium@1.136/Build/Cesium/Cesium.js"></script>
+  <style>
+    html, body, #cesiumContainer {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+    }
+  </style>
+</head>
+<body>
+<div id="cesiumContainer"></div>
+
+<script>
+  /*************************
+   * 1️⃣ Viewer 初始化
+   *************************/
+  const viewer = new Cesium.Viewer('cesiumContainer', {
+    timeline: false,
+    animation: false,
+    geocoder: false,
+    homeButton: false,
+    sceneModePicker: false,
+    baseLayerPicker: false,
+    navigationHelpButton: false,
+    terrainProvider: undefined
+  });
+
+  /*************************
+   * 2️⃣ 球参数配置
+   *************************/
+  const config = {
+    lng: 116.404,
+    lat: 39.915,
+    height: 80,          // 球中心高度
+    radius: 30,          // 基础半径（米）
+    color: Cesium.Color.CYAN
+  };
+
+  const center = Cesium.Cartesian3.fromDegrees(
+    config.lng,
+    config.lat,
+    config.height
+  );
+
+  /*************************
+   * 3️⃣ 填充球（主体）
+   *************************/
+  const fillBall = viewer.entities.add({
+    position: center,
+    ellipsoid: {
+      radii: new Cesium.Cartesian3(
+        config.radius,
+        config.radius,
+        config.radius
+      ),
+      material: config.color.withAlpha(0.35),
+      outline: false
+    }
+  });
+
+  /*************************
+   * 4️⃣ 外轮廓球（描边）
+   *************************/
+  const outlineBall = viewer.entities.add({
+    position: center,
+    ellipsoid: {
+      radii: new Cesium.Cartesian3(
+        config.radius * 1.05,
+        config.radius * 1.05,
+        config.radius * 1.05
+      ),
+      material: Cesium.Color.TRANSPARENT,
+      outline: true,
+      outlineColor: config.color,
+      outlineWidth: 2
+    }
+  });
+
+  /*************************
+   * 5️⃣ 呼吸动画（工程级写法）
+   *************************/
+  let scale = 1;
+  let direction = 1;
+
+  viewer.clock.onTick.addEventListener(() => {
+    scale += direction * 0.005;
+
+    if (scale > 1.15 || scale < 0.9) {
+      direction *= -1;
+    }
+
+    const r = config.radius * scale;
+
+    fillBall.ellipsoid.radii =
+      new Cesium.Cartesian3(r, r, r);
+
+    outlineBall.ellipsoid.radii =
+      new Cesium.Cartesian3(r * 1.05, r * 1.05, r * 1.05);
+
+    outlineBall.ellipsoid.outlineColor =
+      config.color.withAlpha(
+        0.6 + 0.4 * Math.sin(scale * Math.PI)
+      );
+  });
+
+  /*************************
+   * 6️⃣ 镜头聚焦
+   *************************/
+  viewer.zoomTo(
+    fillBall,
+    new Cesium.HeadingPitchRange(
+      0,
+      -0.4,
+      200
+    )
+  );
+</script>
+</body>
+</html>
