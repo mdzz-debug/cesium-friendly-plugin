@@ -288,6 +288,15 @@ export class SmartGeometryEntity extends GeometryEntity {
         }
     });
     
+    // Stabilize spin axis across animation legs: do not toggle between start/target
+    if (targetState._spinAxis !== undefined) {
+        startState._spinAxis = targetState._spinAxis;
+        this._animContext.startValues._spinAxis = targetState._spinAxis;
+        if (targets._spinAxis !== undefined) {
+            delete targets._spinAxis;
+        }
+    }
+    
     this._animContext.targets = targets;
     
     // If there are no targets (start equals end), skip starting animation to avoid side effects
@@ -349,7 +358,12 @@ export class SmartGeometryEntity extends GeometryEntity {
             const e = targets[key];
             
             if (typeof s === 'number' && typeof e === 'number') {
-                 if (isRepeat && (key === 'rotationAngle' || key === '_spinAngle')) {
+                const twoPi = 2 * Math.PI;
+                const isAngleKey = key === 'rotationAngle' || key === '_spinAngle' || key === 'sectorStartAngle' || key === 'sectorSweepAngle';
+                const diff = Math.abs(e - s);
+                const mod = diff % twoPi;
+                const connected = isRepeat && isAngleKey && (mod < 1e-6 || Math.abs(mod - twoPi) < 1e-6);
+                 if (connected) {
                      current[key] = s + (e - s) * (cycles + t);
                  } else if (forward) {
                      current[key] = s + (e - s) * t;
@@ -421,7 +435,7 @@ export class SmartGeometryEntity extends GeometryEntity {
         // 1. Call GeometryEntity.update to set properties (bypass SmartGeometryEntity.update)
         super.update(current); 
 
-        // 2. Decide if we need _applySmartGeometry
+            // 2. Decide if we need _applySmartGeometry
         const kind = (this.kind || '').toLowerCase();
         if (kind === 'wall' && this.wallPositionsData) {
              // Optimized: Wall uses CallbackProperty, so properties set by super.update 
@@ -529,14 +543,15 @@ export class SmartGeometryEntity extends GeometryEntity {
         return;
     }
 
-    console.log('[SmartGeometryEntity] Updating Debug Axes for', this.id);
+    // 
 
-    // We need 3 lines: X (Red), Y (Green), Z (Blue)
-    const axes = [
-        { id: `${this.id}__debugAxisX`, color: Cesium.Color.RED, vector: new Cesium.Cartesian3(1, 0, 0) },
-        { id: `${this.id}__debugAxisY`, color: Cesium.Color.GREEN, vector: new Cesium.Cartesian3(0, 1, 0) },
-        { id: `${this.id}__debugAxisZ`, color: Cesium.Color.BLUE, vector: new Cesium.Cartesian3(0, 0, 1) }
-    ];
+    // // We need 3 lines: X (Red), Y (Green), Z (Blue)
+    // const axes = [
+    //     { id: `${this.id}__debugAxisX`, color: Cesium.Color.RED, vector: new Cesium.Cartesian3(1, 0, 0) },
+    //     { id: `${this.id}__debugAxisY`, color: Cesium.Color.GREEN, vector: new Cesium.Cartesian3(0, 1, 0) },
+    //     { id: `${this.id}__debugAxisZ`, color: Cesium.Color.BLUE, vector: new Cesium.Cartesian3(0, 0, 1) }
+    // ];
+    const axes = [];
 
     // Define the callback function generator
     const createUpdateCallback = (localVector, axisName) => (time) => {

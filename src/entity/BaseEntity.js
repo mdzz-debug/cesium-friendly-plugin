@@ -900,7 +900,12 @@ export class BaseEntity {
             const e = targets[key];
             
             if (typeof s === 'number' && typeof e === 'number') {
-                 if (isRepeat && key === 'rotationAngle') {
+                 const twoPi = 2 * Math.PI;
+                 const isAngleKey = key === 'rotationAngle' || key === '_spinAngle' || key === 'sectorStartAngle' || key === 'sectorSweepAngle';
+                 const diff = Math.abs(e - s);
+                 const mod = diff % twoPi;
+                 const connected = isRepeat && isAngleKey && (mod < 1e-6 || Math.abs(mod - twoPi) < 1e-6);
+                 if (connected) {
                      current[key] = s + (e - s) * (cycles + t);
                  } else if (forward) {
                      current[key] = s + (e - s) * t;

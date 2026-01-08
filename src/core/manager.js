@@ -330,6 +330,9 @@ class PointsManager {
           this.updateEntityPosition(this._draggedPoint.id, newPos);
           // 触发 drag 事件
           this._draggedPoint.trigger('drag', this._draggedPoint, newPos);
+          
+          // 拖拽过程中保持 move 样式
+          this.viewer.scene.canvas.style.cursor = 'move';
         }
         return;
       }
@@ -366,7 +369,23 @@ class PointsManager {
       }
       const canvas = this.viewer.scene.canvas;
       if (hoveredId) {
-        canvas.style.cursor = 'pointer';
+        const point = this.points.get(hoveredId);
+        if (point) {
+            const hasClick = point._eventHandlers && point._eventHandlers.has('click') && point._eventHandlers.get('click').size > 0;
+            const isDraggable = point._draggable;
+
+            if (hasClick) {
+                // 如果配置了点击事件（无论是否可拖拽），默认显示 pointer
+                canvas.style.cursor = 'pointer';
+            } else if (isDraggable) {
+                // 如果只配置了拖拽，显示 move
+                canvas.style.cursor = 'move';
+            } else {
+                canvas.style.cursor = 'default';
+            }
+        } else {
+            canvas.style.cursor = 'default';
+        }
       } else {
         canvas.style.cursor = 'default';
       }

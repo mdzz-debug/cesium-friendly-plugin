@@ -46,6 +46,15 @@ export class CircleEntity extends SmartGeometryEntity {
         }
     });
     
+    // Stabilize spin axis across animation legs: keep target axis constant
+    if (targetState._spinAxis !== undefined) {
+        startState._spinAxis = targetState._spinAxis;
+        this._animContext.startValues._spinAxis = targetState._spinAxis;
+        if (targets._spinAxis !== undefined) {
+            delete targets._spinAxis;
+        }
+    }
+    
     this._animContext.targets = targets;
     
     this._savedState = deepClone(startState);
@@ -85,7 +94,15 @@ export class CircleEntity extends SmartGeometryEntity {
             const e = targets[key];
             
             if (typeof s === 'number' && typeof e === 'number') {
-                 if (forward) {
+                 const twoPi = 2 * Math.PI;
+                 const isAngleKey = key === 'rotationAngle' || key === '_spinAngle' || key === 'sectorStartAngle' || key === 'sectorSweepAngle';
+                 const diff = Math.abs(e - s);
+                 const mod = diff % twoPi;
+                 const connected = this._animContext.repeat && isAngleKey && (mod < 1e-6 || Math.abs(mod - twoPi) < 1e-6);
+                 if (connected) {
+                     const cycles = Math.floor(elapsed / legDuration);
+                     current[key] = s + (e - s) * (cycles + t);
+                 } else if (forward) {
                      current[key] = s + (e - s) * t;
                  } else {
                      current[key] = e + (s - e) * t;
@@ -456,10 +473,13 @@ export class CircleEntity extends SmartGeometryEntity {
                   let sweep = this.sectorSweepAngle;
                   if (sweep === undefined) sweep = 2 * Math.PI;
                   if (Math.abs(sweep - 2 * Math.PI) < 0.001) sweep = 2 * Math.PI;
-                  let a = ((this.rotationAngle || 0) + (this._spinAngle || 0)) % (2 * Math.PI); 
-                  if (a < 0) a += (2 * Math.PI); 
-                  if (Math.abs(a) < 1e-4) a = 1e-4; 
-                  if (Math.abs(a - (2 * Math.PI)) < 1e-4) a = (2 * Math.PI) - 1e-4; 
+                  let a = (this.rotationAngle || 0) + (this._spinAngle || 0);
+                  if (!(this._animContext && this._animContext.repeat)) {
+                    a = a % (2 * Math.PI);
+                    if (a < 0) a += (2 * Math.PI);
+                    if (Math.abs(a) < 1e-9) a = 1e-9;
+                    if (Math.abs(a - (2 * Math.PI)) < 1e-9) a = (2 * Math.PI) - 1e-9;
+                  }
                   const start = (this.sectorStartAngle || 0) + a;
                   try {
                     const deg = a * 180 / Math.PI;
@@ -527,10 +547,13 @@ export class CircleEntity extends SmartGeometryEntity {
                    let sweep = this.sectorSweepAngle;
                   if (sweep === undefined) sweep = 2 * Math.PI;
                   if (Math.abs(sweep - 2 * Math.PI) < 0.001) sweep = 2 * Math.PI;
-                  let a = ((this.rotationAngle || 0) + (this._spinAngle || 0)) % (2 * Math.PI); 
-                  if (a < 0) a += (2 * Math.PI); 
-                  if (Math.abs(a) < 1e-4) a = 1e-4; 
-                  if (Math.abs(a - (2 * Math.PI)) < 1e-4) a = (2 * Math.PI) - 1e-4; 
+                  let a = (this.rotationAngle || 0) + (this._spinAngle || 0);
+                  if (!(this._animContext && this._animContext.repeat)) {
+                     a = a % (2 * Math.PI);
+                     if (a < 0) a += (2 * Math.PI);
+                     if (Math.abs(a) < 1e-9) a = 1e-9;
+                     if (Math.abs(a - (2 * Math.PI)) < 1e-9) a = (2 * Math.PI) - 1e-9;
+                  }
                   const start = (this.sectorStartAngle || 0) + a;
                    try {
                      const deg = a * 180 / Math.PI;
@@ -603,10 +626,13 @@ export class CircleEntity extends SmartGeometryEntity {
            updateOutline(e.ellipse);
 
            {
-             let a3 = ((this.rotationAngle || 0) + (this._spinAngle || 0)) % (2 * Math.PI);
-             if (a3 < 0) a3 += (2 * Math.PI);
-             if (Math.abs(a3) < 1e-4) a3 = 1e-4;
-             if (Math.abs(a3 - (2 * Math.PI)) < 1e-4) a3 = (2 * Math.PI) - 1e-4;
+             let a3 = (this.rotationAngle || 0) + (this._spinAngle || 0);
+             if (!(this._animContext && this._animContext.repeat)) {
+               a3 = a3 % (2 * Math.PI);
+               if (a3 < 0) a3 += (2 * Math.PI);
+               if (Math.abs(a3) < 1e-9) a3 = 1e-9;
+               if (Math.abs(a3 - (2 * Math.PI)) < 1e-9) a3 = (2 * Math.PI) - 1e-9;
+             }
              e.ellipse.rotation = a3;
            }
            e.ellipse.extrudedHeight = this.extrudedHeight;
