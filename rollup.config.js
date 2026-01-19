@@ -1,8 +1,28 @@
 import resolve from '@rollup/plugin-node-resolve';
 import commonjs from '@rollup/plugin-commonjs';
 import terser from '@rollup/plugin-terser';
+import fs from 'fs';
+import path from 'path';
 
 const shouldMinify = !process.env.ROLLUP_WATCH;
+
+const copyAssets = () => ({
+  name: 'copy-assets',
+  writeBundle() {
+    try {
+      const srcDir = path.resolve('src/assets/material');
+      const distDir = path.resolve('dist/assets/material');
+      fs.mkdirSync(distDir, { recursive: true });
+      const files = ['waterNormals.jpg', 'material.png'];
+      files.forEach((f) => {
+        const src = path.join(srcDir, f);
+        if (fs.existsSync(src)) {
+          fs.copyFileSync(src, path.join(distDir, f));
+        }
+      });
+    } catch (_) {}
+  }
+});
 
 export default [
   // Main entry
@@ -35,7 +55,8 @@ export default [
       shouldMinify ? terser({
         keep_classnames: true,
         keep_fnames: true
-      }) : null
+      }) : null,
+      copyAssets()
     ].filter(Boolean),
     external: ['cesium']
   },
@@ -62,7 +83,8 @@ export default [
       shouldMinify ? terser({
         keep_classnames: true,
         keep_fnames: true
-      }) : null
+      }) : null,
+      copyAssets()
     ].filter(Boolean),
     external: ['cesium']
   }

@@ -46,8 +46,7 @@ export class GeometryEntity extends BaseEntity {
     // Position is special - user expects immediate update usually, 
     // but to strictly follow lifecycle, we should defer it?
     // However, _updateEntityPosition is used internally.
-    // Let's keep it lazy as requested.
-    // this._updateEntityPosition();
+    this._updateEntityPosition();
     
     this.trigger('change', this);
     return this;
@@ -112,6 +111,7 @@ export class GeometryEntity extends BaseEntity {
       this.heightReference = 'relativeToGround';
     }
     
+    this._updateEntityPosition();
     this.trigger('change', this);
     return this;
   }
@@ -356,14 +356,14 @@ export class GeometryEntity extends BaseEntity {
       }
 
       // Horizontal Origin
-      if (this.horizontalOrigin) {
+      if (this.horizontalOrigin && !this._asCanvas && !this.isCanvas) {
           const val = this._getHorizontalOrigin(this.horizontalOrigin);
           if (this.entity.billboard) this.entity.billboard.horizontalOrigin = val;
           if (this.entity.label) this.entity.label.horizontalOrigin = val;
       }
 
       // Vertical Origin
-      if (this.verticalOrigin) {
+      if (this.verticalOrigin && !this._asCanvas && !this.isCanvas) {
           const val = this._getVerticalOrigin(this.verticalOrigin);
           if (this.entity.billboard) this.entity.billboard.verticalOrigin = val;
           if (this.entity.label) this.entity.label.verticalOrigin = val;

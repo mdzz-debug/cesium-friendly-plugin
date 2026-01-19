@@ -1,5 +1,6 @@
 import { GeometryEntity } from './GeometryEntity.js';
 import { deepClone } from '../utils/deepClone.js';
+import WaterMaterialProperty from '../material/WaterMaterialProperty.js';
 
 export class SmartGeometryEntity extends GeometryEntity {
   static Types = {};
@@ -1052,6 +1053,12 @@ export class SmartGeometryEntity extends GeometryEntity {
 
   _resolveMaterial(m) {
     if (typeof m === 'string' && m.length > 0) {
+      if (m === 'water') {
+        return new WaterMaterialProperty({
+          baseWaterColor: new this.cesium.Color(0.2, 0.3, 0.6, 1.0),
+          blendColor: new this.cesium.Color(0.0, 1.0, 0.699, 1.0)
+        });
+      }
       let c = this.cesium.Color.fromCssColorString(m);
       if (this.materialOpacity !== undefined) {
         c = new this.cesium.Color(c.red, c.green, c.blue, this.materialOpacity);

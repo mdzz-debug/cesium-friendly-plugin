@@ -1,8 +1,18 @@
-# SmartGeometryEntity 使用说明
+# 几何实体（Geometry / SmartGeometryEntity）
 
-- 统一几何实体：通过一个类生成并切换多种几何图形
-- 支持形态切换与少量参数组合：圆 ⇄ 球，圆/椭圆扇形（半圆、四分之一圆），圆柱 ⇄ 圆锥，椭圆 ⇄ 椭球体等
-- 需先初始化插件：`CesiumFriendlyPlugin.init(Cesium, viewer)`
+几何实体用于在三维地球上绘制各种体块类图形，例如圆/椭圆、球体、矩形、盒子、墙体、圆柱/圆锥等。  
+在 CesiumFriendlyPlugin 中，几何实体通过 `SmartGeometryEntity` 统一封装，无需记住 Cesium 原生的每一种 Geometry/Primitive 类型。
+
+- 统一几何实体：通过一个类生成并切换多种几何图形  
+- 支持形态切换与少量参数组合：圆 ⇄ 球，圆/椭圆扇形（半圆、四分之一圆），圆柱 ⇄ 圆锥，椭圆 ⇄ 椭球体等  
+- 支持扇形裁剪、挤出、旋转轴控制、墙体/走廊等高级形态  
+
+需先初始化插件：
+
+```js
+// 推荐用法
+cf.init(viewer);
+```
 
 ## 支持的几何
 - 点：point
@@ -22,19 +32,22 @@
 
 ```js
 const cf = CesiumFriendlyPlugin;
+cf.init(viewer);
+
 const g = cf.geometry({ position: [111, 40, 200000] });
 ```
 
-- 通用方法
-  - shape(kind): 设定形态（如 'circle'、'ellipse'、'sphere'、'cylinder' 等）
-  - mode(dim): '2d' 或 '3d'（例如 circle 在 3d 下变为 sphere）
-  - radius(r) / radii(x, y, z) / semiAxes(major, minor)
-  - rotation(angle, axis) / rotationDeg(deg, axis): 旋转角度（弧度/度）及轴向（'X', 'Y', 'Z'）
-  - setOpacity(alpha) // 设置材质透明度（0~1）
-  - extrude(height) // 挤出高度
-  - setHeight(height) // 设置离地高度（自动处理贴地模式）
-  - material(m), outline(enabled, color, width)
-  - add(), update()
+通用方法能力概览：
+
+- `shape(kind)`: 设定形态（如 'circle'、'ellipse'、'sphere'、'cylinder' 等）
+- `mode(dim)`: '2d' 或 '3d'（例如 circle 在 3d 下变为 sphere）
+- `radius(r)` / `radii(x, y, z)` / `semiAxes(major, minor)`
+- `rotation(angle, axis)` / `rotationDeg(deg, axis)`: 旋转角度（弧度/度）及轴向（'X' | 'Y' | 'Z'）
+- `setOpacity(alpha)`: 设置材质透明度（0~1）
+- `extrude(height)`: 挤出高度
+- `setHeight(height)`: 设置离地高度（自动处理贴地模式）
+- `material(m)`, `outline(enabled, color, width)`
+- `add()`, `update()`
 
 ## 圆 ⇄ 扇形 ⇄ 椭圆 ⇄ 球
 
@@ -260,4 +273,97 @@ const ellipse = cf.geometry({ position: [111, 40, 200000] })
   .add();
 ellipse.animate(6000, { loop: true });
 ellipse.update({ rotationAngle: Math.PI * 2 });
+```
+
+## 事件与生命周期 (Events & Lifecycle)
+
+几何实体同样继承了统一的事件与生命周期能力，和 Point/Billboard/Label 保持一致：
+
+- `on(type, handler)`: 绑定事件（'click'、'hover'、'dragstart'、'drag'、'dragend'、'select'、'unselect' 等）。  
+- `off(type, handler)`: 解绑事件。  
+- `select()/deselect()`: 手动选中/取消选中。  
+- `delete()`: 销毁实体。  
+- `setGroup(name)`: 设置业务分组。
+
+事件回调中第一个参数为当前几何实体实例 `e`，可继续调用 `update`、`material`、`extrude` 等方法修改自身。
+
+### 点击事件：高亮几何
+
+```js
+cf.geometry({ position: [111, 40, 200000] })
+  .shape('circle')
+  .mode('2d')
+  .radius(300000)
+  .material('rgba(0, 128, 255, 0.4)')
+  .outline(true, '#0080FF', 1)
+  .on('click', (e) => {
+    // 使用 e.update 继续链式更新材质与挤出高度
+    e.update({
+      material: 'rgba(255, 192, 0, 0.6)',
+      extrudedHeight: 100000
+    });
+  })
+  .add();
+```
+
+### 悬停事件：改变透明度或边框
+
+```js
+cf.geometry({ position: [107, 40, 300000] })
+  .shape('circle')
+  .mode('3d')
+  .radius(300000)
+  .material('rgba(0, 255, 0, 0.3)')
+  .outline(true, '#00FF00', 1)
+  .on('hover', (e, isHover) => {
+    if (isHover) {
+      e.setOpacity(0.8);
+      e.outline(true, '#FFFF00', 2);
+    } else {
+      e.setOpacity(0.3);
+      e.outline(true, '#00FF00', 1);
+    }
+  })
+  .add();
+```
+
+### 拖拽事件：移动几何中心
+
+几何实体同样支持 `.draggable(true)`。`drag` 事件回调接收 `(e, position)`，`position` 为当前拖拽到的 `[lng, lat]`。
+
+```js
+cf.geometry({
+  position: [100, 40, 0]
+})
+  .shape('box')
+  .dimensions(100000, 50000, 50000)
+  .material('orange')
+  .draggable(true)
+  .on('drag', (e, pos) => {
+    // 保持高度不变，只更新经纬度
+    const h = e.position[2] || 0;
+    e.setPosition([pos[0], pos[1], h]);
+  })
+  .add();
+```
+
+### 选中与取消选中：切换样式
+
+```js
+cf.geometry({
+  position: [105, 35, 0]
+})
+  .shape('rectangle')
+  .rectangleCoordinatesSet(Cesium.Rectangle.fromDegrees(100, 30, 110, 40))
+  .material('rgba(0, 128, 255, 0.4)')
+  .outline(true, '#0080FF', 1)
+  .on('select', (e) => {
+    e.material('rgba(255, 0, 0, 0.6)');
+    e.outline(true, '#FF0000', 2);
+  })
+  .on('unselect', (e) => {
+    e.material('rgba(0, 128, 255, 0.4)');
+    e.outline(true, '#0080FF', 1);
+  })
+  .add();
 ```

@@ -1,15 +1,62 @@
+import * as CesiumLib from 'cesium';
 import pluginInstance from './core/instance.js';
 import pointsManager from './core/manager.js';
 import canvasManager from './core/canvasManager.js';
 import debuggerManager from './debugger/index.js';
 import flyManager from './earth/fly.js';
 import { createEntityApi } from './entity/index.js';
+import Material from './material/index.js';
+import VuePlugin from './vue-plugin.js';
 
 
 
-pluginInstance.init = function(cesium, viewer, options = {}) {
+pluginInstance.init = function(arg1, arg2, arg3) {
   console.log('%c 🌍 CesiumFriendlyPlugin Initialized ', 'background: #3b82f6; color: white; padding: 2px 5px; border-radius: 2px; font-weight: bold;');
   console.log('%c 🚀 Ready to fly! ', 'background: #10b981; color: white; padding: 2px 5px; border-radius: 2px; font-weight: bold;');
+
+  // Argument Resolution
+  let cesium, viewer, options;
+
+  // Helper to check if an object looks like a Viewer (or Ref<Viewer>)
+  const isViewer = (obj) => {
+      if (!obj) return false;
+      // Direct viewer object (check for typical properties)
+      if (obj.scene && obj.entities && obj.camera) return true;
+      // Vue Ref
+      if (obj.value && obj.value.scene && obj.value.entities && obj.value.camera) return true;
+      return false;
+  };
+
+  // Case 1: init(viewer, options) - Cesium inferred
+  if (isViewer(arg1)) {
+      viewer = arg1;
+      options = arg2 || {};
+      // Try to resolve Cesium from import or global
+      if (typeof CesiumLib !== 'undefined' && CesiumLib.Viewer) {
+          cesium = CesiumLib;
+      } else if (typeof window !== 'undefined' && window.Cesium) {
+          cesium = window.Cesium;
+      }
+  } 
+  // Case 2: init(cesium, viewer, options) - Standard
+  else {
+      cesium = arg1;
+      viewer = arg2;
+      options = arg3 || {};
+  }
+
+  // Final fallback for cesium if passed as null/undefined in standard signature
+  if (!cesium) {
+      if (typeof CesiumLib !== 'undefined' && CesiumLib.Viewer) {
+          cesium = CesiumLib;
+      } else if (typeof window !== 'undefined' && window.Cesium) {
+          cesium = window.Cesium;
+      }
+  }
+
+  if (!cesium) {
+      console.warn('[CesiumFriendlyPlugin] Cesium object not found. Please pass it to init() or ensure "cesium" is available as an import or global window.Cesium.');
+  }
 
   this._cesium = cesium;
   
@@ -147,12 +194,19 @@ pluginInstance.getCurrentCamera = () => flyManager.getCurrentCamera();
 pluginInstance.setSurfaceOpacity = (opacity) => flyManager.setSurfaceOpacity(opacity);
 pluginInstance.setDepthTest = (enabled) => flyManager.setDepthTest(enabled);
 
+// Material API
+pluginInstance.Material = Material;
+
+// Attach install method to pluginInstance for Vue.use() support
+pluginInstance.install = VuePlugin.install;
+
 // Export for ES6 modules
 export default pluginInstance;
+export const cf = pluginInstance; // Support named import: import { cf } from ...
 
 // Global registration (for browser)
 if (typeof window !== 'undefined') {
-  window.CesiumFriendlyPlugin = pluginInstance;
+  window.cf = pluginInstance;
 }
 
 // Export Vue plugin

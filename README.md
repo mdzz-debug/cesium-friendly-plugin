@@ -144,11 +144,11 @@ cf.point({...}).label({...}).toCanvas(2).add();
 
 ```javascript
 // main.js
-import { VuePlugin } from 'cesium-friendly-plugin';
-app.use(VuePlugin);
+import cf from 'cesium-friendly-plugin';
+app.use(cf);
 
 // 组件中
-this.$cesiumPlugin.billboard.add(...);
+this.$cf.billboard.add(...);
 ```
 
 ## 构建
