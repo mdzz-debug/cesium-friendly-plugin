@@ -116,12 +116,14 @@ export class PointEntity extends GeometryEntity {
       this._colorCached = this.cesium.Color.fromCssColorString(this.color);
       this._colorCached.alpha = this.opacity;
     }
+    this._applyPointStyles();
     this.trigger('change', this);
     return this;
   }
 
   setPixelSize(size) {
     this.pixelSize = size;
+    this._applyPointStyles();
     this.trigger('change', this);
     return this;
   }
@@ -130,6 +132,7 @@ export class PointEntity extends GeometryEntity {
     this.opacity = opacity;
     if (this._colorCached) this._colorCached.alpha = this.opacity;
     if (this._outlineColorCached) this._outlineColorCached.alpha = this.opacity;
+    this._applyPointStyles();
     this.trigger('change', this);
     return this;
   }
@@ -140,12 +143,14 @@ export class PointEntity extends GeometryEntity {
       this._outlineColorCached = this.cesium.Color.fromCssColorString(this.outlineColor);
       this._outlineColorCached.alpha = this.opacity;
     }
+    this._applyPointStyles();
     this.trigger('change', this);
     return this;
   }
 
   setOutlineWidth(width) {
     this.outlineWidth = width;
+    this._applyPointStyles();
     this.trigger('change', this);
     return this;
   }
@@ -155,6 +160,7 @@ export class PointEntity extends GeometryEntity {
     if (color) this.outlineColor = color;
     if (width) this.outlineWidth = width;
     
+    this._applyPointStyles();
     this.trigger('change', this);
     return this;
   }

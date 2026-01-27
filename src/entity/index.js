@@ -183,6 +183,16 @@ export function createEntityApi(pluginInstance) {
     label: createFactory(LabelEntityClass, 'label'),
     geometry: createFactory(SmartGeometryEntityClass, 'geometry'),
     
+    // Shortcuts for Geometries
+    circle: createFactory(CircleEntityClass, 'geometry'),
+    ellipse: createFactory(CircleEntityClass, 'geometry'),
+    sphere: createFactory(CircleEntityClass, 'geometry'),
+    ellipsoid: createFactory(CircleEntityClass, 'geometry'),
+    cylinder: createFactory(CylinderEntityClass, 'geometry'),
+    cone: createFactory(ConeEntityClass, 'geometry'),
+    box: createFactory(BoxEntityClass, 'geometry'),
+    rectangle: createFactory(RectangleEntityClass, 'geometry'),
+    
     // Future types placeholders
     polyline: (arg1, arg2) => {
         // console.warn('PolylineEntity not yet implemented');

@@ -5,6 +5,7 @@ import { renderPointDebugger } from './point.js';
 import { renderBillboardDebugger } from './billboard.js';
 import { renderLabelDebugger } from './label.js';
 import { renderEarthDebugger } from './earth.js';
+import { renderGeometryDebugger } from './geometry.js';
 import { t } from './utils.js';
 
 class Debugger {
@@ -290,47 +291,61 @@ class Debugger {
         }
         
         // 1. Get Entity Screen Position
-        const pos = target.position; // [lng, lat, alt]
-        if (!pos) {
-             if (this.connectorPath) this.connectorPath.style.display = 'none';
-             if (this.connectorPoint) this.connectorPoint.style.display = 'none';
-             return;
-        }
+        let lng, lat, alt;
 
-        // Validate coordinates
-        let lng = pos.lng ?? pos[0];
-        let lat = pos.lat ?? pos[1];
-        const absAlt = pos.alt ?? pos[2] ?? 0;
-        const heightOffset = typeof target.heightOffset === 'number' ? target.heightOffset : 0;
-        const hasHeightOffset = heightOffset !== 0;
-        const heightReference = target.heightReference === 'relativeToGround' || (target.heightReference === 'clampToGround' && hasHeightOffset)
-          ? 'relativeToGround'
-          : (target.heightReference || 'none');
-        let alt = 0;
+        let centerPos = typeof target.getCenter === 'function' ? target.getCenter() : null;
 
-        if (typeof lng !== 'number' || typeof lat !== 'number') {
-             if (this.connectorPath) this.connectorPath.style.display = 'none';
-             if (this.connectorPoint) this.connectorPoint.style.display = 'none';
-             return;
-        }
-
-        // Handle height reference (clampToGround / relativeToGround)
-        if ((heightReference === 'clampToGround' || heightReference === 'relativeToGround') && scene.globe) {
-            const cartographic = Cesium.Cartographic.fromDegrees(lng, lat);
-            const terrainHeight = scene.globe.getHeight(cartographic);
-            if (terrainHeight !== undefined) {
-                if (heightReference === 'clampToGround') {
-                    alt = terrainHeight;
-                } else {
-                    alt = terrainHeight + heightOffset;
-                }
-            } else {
-                alt = heightReference === 'relativeToGround' ? heightOffset : 0;
-            }
-        } else if (heightReference === 'relativeToGround') {
-            alt = heightOffset;
+        if (centerPos) {
+            lng = centerPos.lng;
+            lat = centerPos.lat;
+            alt = centerPos.alt;
+        } else if (this.clickPosition && this.currentPoint === target) {
+            lng = this.clickPosition.lng;
+            lat = this.clickPosition.lat;
+            alt = this.clickPosition.alt;
         } else {
-            alt = absAlt + heightOffset;
+            const pos = target.position; // [lng, lat, alt]
+            if (!pos) {
+                 if (this.connectorPath) this.connectorPath.style.display = 'none';
+                 if (this.connectorPoint) this.connectorPoint.style.display = 'none';
+                 return;
+            }
+
+            // Validate coordinates
+            lng = pos.lng ?? pos[0];
+            lat = pos.lat ?? pos[1];
+            const absAlt = pos.alt ?? pos[2] ?? 0;
+            
+            if (typeof lng !== 'number' || typeof lat !== 'number') {
+                 if (this.connectorPath) this.connectorPath.style.display = 'none';
+                 if (this.connectorPoint) this.connectorPoint.style.display = 'none';
+                 return;
+            }
+
+            const heightOffset = typeof target.heightOffset === 'number' ? target.heightOffset : 0;
+            const hasHeightOffset = heightOffset !== 0;
+            const heightReference = target.heightReference === 'relativeToGround' || (target.heightReference === 'clampToGround' && hasHeightOffset)
+              ? 'relativeToGround'
+              : (target.heightReference || 'none');
+            
+            // Handle height reference (clampToGround / relativeToGround)
+            if ((heightReference === 'clampToGround' || heightReference === 'relativeToGround') && scene.globe) {
+                const cartographic = Cesium.Cartographic.fromDegrees(lng, lat);
+                const terrainHeight = scene.globe.getHeight(cartographic);
+                if (terrainHeight !== undefined) {
+                    if (heightReference === 'clampToGround') {
+                        alt = terrainHeight;
+                    } else {
+                        alt = terrainHeight + heightOffset;
+                    }
+                } else {
+                    alt = heightReference === 'relativeToGround' ? heightOffset : 0;
+                }
+            } else if (heightReference === 'relativeToGround') {
+                alt = heightOffset;
+            } else {
+                alt = absAlt + heightOffset;
+            }
         }
 
         const cartesian = Cesium.Cartesian3.fromDegrees(lng, lat, alt);
@@ -378,9 +393,10 @@ class Debugger {
     this._removePostRender = scene.postRender.addEventListener(updateLine);
   }
 
-  _onRightClick(point) {
+  _onRightClick(point, pos) {
     if (!this.enabled) return;
     this.currentPoint = point;
+    this.clickPosition = pos;
     this._updateHighlight(point);
     this.render();
     this.container.style.display = 'block';
@@ -406,6 +422,8 @@ class Debugger {
       renderLabelDebugger(this.content, point, this.lang);
     } else if (point.type === 'earth') {
       renderEarthDebugger(this.content, point, this.lang);
+    } else if (point.type === 'geometry') {
+      renderGeometryDebugger(this.content, point, this.lang);
     }
   }
 }

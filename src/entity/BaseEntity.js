@@ -376,6 +376,11 @@ export class BaseEntity {
     if (this._animContext && !this._animFrame) {
         this._startAnimation();
     }
+
+    // Auto-start flash if pending
+    if (this._flashing && this._flashParams) {
+        this.flash(this._flashParams.enable, this._flashParams.duration, this._flashParams.options);
+    }
   }
 
   show() {
@@ -665,7 +670,10 @@ export class BaseEntity {
       duration = options.duration || 1000;
     }
 
-    const minOpacity = options.minOpacity != null ? options.minOpacity : 0.0;
+    // Store parameters for deferred execution (if entity not mounted yet)
+    this._flashParams = { enable, duration, options };
+
+    const minOpacity = options.minOpacity != null ? options.minOpacity : 0.1;
     // Capture the intended "normal" opacity from current state if not flashing
     // If already flashing, this.opacity might be intermediate, so this logic is slightly flawed if restarting flash
     // But usually fine.
@@ -686,6 +694,12 @@ export class BaseEntity {
       return this;
     }
 
+    // If entity is not ready, we just set the flag and return.
+    // _mount() will check _flashing and _flashParams to start the animation.
+    if (!this.entity) {
+        return this;
+    }
+
     if (this.entity) this.entity.show = true;
     
     let startTime = performance.now();
@@ -696,20 +710,15 @@ export class BaseEntity {
         if (this._hidden) return;
 
         const elapsed = now - startTime;
-        // Cycle time = duration * 2 (Out + In)
-        const cycleDuration = duration * 2;
-        const cyclePos = elapsed % cycleDuration;
         
-        let currentOpacity;
-        if (cyclePos < duration) {
-            // Fading Out (Max -> Min)
-            const t = cyclePos / duration;
-            currentOpacity = maxOpacity - (maxOpacity - minOpacity) * t;
-        } else {
-            // Fading In (Min -> Max)
-            const t = (cyclePos - duration) / duration;
-            currentOpacity = minOpacity + (maxOpacity - minOpacity) * t;
-        }
+        // Use Cosine wave for smooth breathing effect (1 -> 0.1 -> 1)
+        // period = duration * 2
+        const angle = (elapsed / duration) * Math.PI;
+        // Cosine goes 1 -> -1 -> 1. We want 1 -> 0 -> 1 for the mix factor.
+        // (Math.cos(angle) + 1) / 2 goes from 1 -> 0 -> 1
+        const t = (Math.cos(angle) + 1) / 2;
+        
+        const currentOpacity = minOpacity + (maxOpacity - minOpacity) * t;
 
         // This requires the subclass to implement setOpacity or we access entity directly
         // Better to use a method if available
@@ -719,6 +728,11 @@ export class BaseEntity {
             // Fallback generic opacity handling if possible (complex for mixed entities)
         }
         
+        // Force Cesium to render a new frame to display the change
+        if (this.viewer && this.viewer.scene) {
+            this.viewer.scene.requestRender();
+        }
+
         this._flashTimer = requestAnimationFrame(animateFlash);
     };
 

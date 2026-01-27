@@ -19,47 +19,57 @@ class FlyManager {
       }
 
       let targetPos = positionOrEntity;
+      let lng, lat, alt;
+
+      // 1. Check if it's a SmartGeometryEntity/PointEntity/Wrapper with position array
+      //    (SmartGeometryEntity and PointEntity both store position as [lng, lat, alt])
+      if (targetPos && targetPos.position && Array.isArray(targetPos.position)) {
+          [lng, lat, alt] = targetPos.position;
+      } 
+      // 2. Check if it's a simple object {lng, lat, alt}
+      else if (targetPos && typeof targetPos.lng === 'number' && typeof targetPos.lat === 'number') {
+          lng = targetPos.lng;
+          lat = targetPos.lat;
+          alt = targetPos.alt || 0;
+      }
       
-      // Handle Entity Wrapper or Cesium Entity
-      if (positionOrEntity && (positionOrEntity.position || positionOrEntity.id)) {
-          // It might be our wrapper
-          if (typeof positionOrEntity.position === 'object' && !Array.isArray(positionOrEntity.position)) {
-              // Assume it's a wrapper with {lng, lat, alt} position getter/property
-               // But wait, our wrappers usually have position as getter returning array or internal property?
-               // BaseEntity has position setter, but getting it might be tricky.
-               // Let's check if it has .entity.position
-               if (positionOrEntity.entity && positionOrEntity.entity.position) {
-                   // Use Cesium's flyTo for entities
-                   this.viewer.flyTo(positionOrEntity.entity, {
-                       duration: duration,
-                       offset: orientation ? new this.cesium.HeadingPitchRange(
-                           this.cesium.Math.toRadians(orientation.heading || 0),
-                           this.cesium.Math.toRadians(orientation.pitch || -45),
-                           orientation.range || 0
-                       ) : undefined
-                   }).then(resolve);
-                   return;
+      // Validation: Ensure coordinates are valid numbers
+      if (lng !== undefined && lat !== undefined && !isNaN(lng) && !isNaN(lat)) {
+           // console.log('[FlyManager] Flying to coordinates:', { lng, lat, alt });
+           const targetCartesian = this.cesium.Cartesian3.fromDegrees(lng, lat, alt || 0);
+           const boundingSphere = new this.cesium.BoundingSphere(targetCartesian, 0);
+           
+           this.viewer.camera.flyToBoundingSphere(boundingSphere, {
+               duration: duration,
+               offset: orientation ? new this.cesium.HeadingPitchRange(
+                   this.cesium.Math.toRadians(orientation.heading || 0),
+                   this.cesium.Math.toRadians(orientation.pitch || -90),
+                   orientation.range || 0
+               ) : undefined,
+               complete: () => {
+                   resolve();
                }
-          }
+           });
+           return;
       }
 
-      // Default: Assume {lng, lat, alt} object
-      this.viewer.camera.flyTo({
-        destination: this.cesium.Cartesian3.fromDegrees(
-          targetPos.lng, 
-          targetPos.lat, 
-          targetPos.alt
-        ),
-        orientation: orientation ? {
-          heading: this.cesium.Math.toRadians(orientation.heading),
-          pitch: this.cesium.Math.toRadians(orientation.pitch),
-          roll: this.cesium.Math.toRadians(orientation.roll)
-        } : undefined,
-        duration: duration,
-        complete: () => {
-          resolve();
-        }
-      });
+      // 3. Fallback: Check if it has an .entity property (legacy wrapper or direct Cesium Entity)
+      //    Note: We prefer BoundingSphere method above if position is known, to avoid "tilted view off-center" issues.
+      if (targetPos && (targetPos instanceof this.cesium.Entity || (targetPos.entity && targetPos.entity instanceof this.cesium.Entity))) {
+           const ent = targetPos instanceof this.cesium.Entity ? targetPos : targetPos.entity;
+           this.viewer.flyTo(ent, {
+               duration: duration,
+               offset: orientation ? new this.cesium.HeadingPitchRange(
+                   this.cesium.Math.toRadians(orientation.heading || 0),
+                   this.cesium.Math.toRadians(orientation.pitch || -45),
+                   orientation.range || 0
+               ) : undefined
+           }).then(resolve);
+           return;
+      }
+      
+      // If nothing matched, just resolve
+      resolve();
     });
   }
 

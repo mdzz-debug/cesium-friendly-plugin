@@ -117,42 +117,49 @@ export class BillboardEntity extends GeometryEntity {
 
   setImage(url) {
     this.imageUrl = resolveImageInput(url);
+    this._applyBillboardStyles();
     this.trigger('change', this);
     return this;
   }
 
   setRotation(degree) {
     this.rotation = degree;
+    this._applyBillboardStyles();
     this.trigger('change', this);
     return this;
   }
 
   setColor(color) {
     this.color = color;
+    this._applyBillboardStyles();
     this.trigger('change', this);
     return this;
   }
 
   setOpacity(alpha) {
     this.opacity = alpha;
+    this._applyBillboardStyles();
     this.trigger('change', this);
     return this;
   }
   
   setImageWidth(width) {
     this.width = width;
+    this._applyBillboardStyles();
     this.trigger('change', this);
     return this;
   }
 
   setImageHeight(height) {
     this.height = height;
+    this._applyBillboardStyles();
     this.trigger('change', this);
     return this;
   }
 
   setSizeInMeters(enable) {
     this.sizeInMeters = enable;
+    this._applyBillboardStyles();
     this.trigger('change', this);
     return this;
   }

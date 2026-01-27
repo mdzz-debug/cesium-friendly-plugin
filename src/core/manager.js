@@ -72,10 +72,10 @@ class PointsManager {
     }
   }
 
-  _notifyRightClickListeners(point) {
+  _notifyRightClickListeners(point, pos) {
     for (const listener of this.rightClickListeners) {
       try {
-        listener(point);
+        listener(point, pos);
       } catch (e) {
         console.error('Error in right click listener:', e);
       }
@@ -121,7 +121,21 @@ class PointsManager {
       }
 
       if (clickedPoint) {
-        this._notifyRightClickListeners(clickedPoint);
+        // Get precise pick position on the object
+        const pickRay = this.viewer.camera.getPickRay(click.position);
+        const pickCartesian = this.viewer.scene.pickPosition(click.position);
+        
+        let clickPos = null;
+        if (pickCartesian) {
+           const c = this.cesium.Cartographic.fromCartesian(pickCartesian);
+           clickPos = {
+               lng: this.cesium.Math.toDegrees(c.longitude),
+               lat: this.cesium.Math.toDegrees(c.latitude),
+               alt: c.height
+           };
+        }
+
+        this._notifyRightClickListeners(clickedPoint, clickPos);
       } else {
         // Handle Earth/Globe Click
         const ray = this.viewer.camera.getPickRay(click.position);
@@ -824,26 +838,52 @@ class PointsManager {
   }
 
   findEntitiesAtPosition(position, epsilon = 1e-5) {
-    if (!position || position.length < 2) return [];
-    const [lng, lat] = position;
-    const height = position[2] || 0;
+    if (!position) return [];
+    
+    let lng, lat, height;
+    if (Array.isArray(position)) {
+        if (position.length < 2) return [];
+        lng = position[0];
+        lat = position[1];
+        height = position[2] || 0;
+    } else if (typeof position === 'object') {
+        lng = position.lng;
+        lat = position.lat;
+        height = position.alt !== undefined ? position.alt : (position.height || 0);
+        if (lng === undefined || lat === undefined) return [];
+    } else {
+        return [];
+    }
+
     const res = [];
     for (const point of this.points.values()) {
-      const pos = point.position || [];
-      if (pos.length < 2) continue;
+      const pos = point.position;
+      if (!pos) continue;
       
-      const pLng = pos[0];
-      const pLat = pos[1];
-      const pHeight = pos[2] || 0;
+      let pLng, pLat, pHeight;
+      if (Array.isArray(pos)) {
+          if (pos.length < 2) continue;
+          pLng = pos[0];
+          pLat = pos[1];
+          pHeight = pos[2] || 0;
+      } else if (typeof pos === 'object') {
+          pLng = pos.lng;
+          pLat = pos.lat;
+          pHeight = pos.alt !== undefined ? pos.alt : (pos.height || 0);
+          if (pLng === undefined || pLat === undefined) continue;
+      } else {
+          continue;
+      }
+
+      const heightVal = height || 0;
+      const pHeightVal = pHeight || 0;
 
       // Relaxed check: match lat/lng, and match height only if both are non-zero
-      // If one of them is 0 (likely clampToGround or 2D), we treat it as a match on 2D plane
-      // This helps with clampToGround duplicate detection
       const latLngMatch = Math.abs(pLng - lng) <= epsilon && Math.abs(pLat - lat) <= epsilon;
       
       let heightMatch = true;
-      if (height !== 0 && pHeight !== 0) {
-          heightMatch = Math.abs(pHeight - height) <= epsilon;
+      if (heightVal !== 0 && pHeightVal !== 0) {
+          heightMatch = Math.abs(pHeightVal - heightVal) <= epsilon;
       }
       
       if (latLngMatch && heightMatch) {

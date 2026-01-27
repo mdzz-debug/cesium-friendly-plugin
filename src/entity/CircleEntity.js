@@ -451,7 +451,15 @@ export class CircleEntity extends SmartGeometryEntity {
     // 2D Circle (Ellipse or Polygon)
     const hh = this._effectiveHeight();
     const hr = this._getHeightReferenceEnum();
-    
+
+    // [Fix] Interpret extrudedHeight as thickness (delta)
+    let computedExtrudedHeightSector = this.extrudedHeight;
+    if (computedExtrudedHeightSector !== undefined) {
+        if (hr !== Cesium.HeightReference.CLAMP_TO_GROUND) {
+            computedExtrudedHeightSector += hh;
+        }
+    }
+
     if (this.sectorStartAngle !== undefined && this.sectorSweepAngle !== undefined) {
        // Sector -> Polygon
        if (!e.polygon) {
@@ -513,7 +521,7 @@ export class CircleEntity extends SmartGeometryEntity {
                fill: !!this.fill,
                outline: !!this._outlineEnabled, 
                outlineColor: oc, 
-               extrudedHeight: this.extrudedHeight, 
+               extrudedHeight: computedExtrudedHeightSector, 
                height: hh, 
                heightReference: hr 
            });
@@ -527,7 +535,7 @@ export class CircleEntity extends SmartGeometryEntity {
            updateMaterial(e.polygon);
            updateOutline(e.polygon);
 
-           e.polygon.extrudedHeight = this.extrudedHeight;
+           e.polygon.extrudedHeight = computedExtrudedHeightSector;
            e.polygon.height = hh;
            e.polygon.heightReference = hr;
            
@@ -589,10 +597,20 @@ export class CircleEntity extends SmartGeometryEntity {
           // Full Circle -> Ellipse
           const a = this.semiMajorAxis || this.radiusValue || 1000;
           const b = this.semiMinorAxis || this.radiusValue || 1000;
+
+          // [Fix] Interpret extrudedHeight as thickness (delta) instead of absolute altitude
+          // unless clamped to ground (where base is implicitly 0 relative to ground).
+          let computedExtrudedHeight = this.extrudedHeight;
+          if (computedExtrudedHeight !== undefined) {
+             if (hr !== Cesium.HeightReference.CLAMP_TO_GROUND) {
+                computedExtrudedHeight += hh;
+             }
+          }
+
           if (!e.ellipse) {
            mat = this._resolveMaterial(this._material);
            oc = this._resolveColor(this._outlineColor);
-           e.ellipse = new Cesium.EllipseGraphics({ semiMajorAxis: a, semiMinorAxis: b, height: hh, material: mat, fill: this.fill, outline: !!this._outlineEnabled, outlineColor: oc, outlineWidth: this._outlineWidth, rotation: (this.rotationAngle || 0) + (this._spinAngle || 0), extrudedHeight: this.extrudedHeight, heightReference: hr });
+           e.ellipse = new Cesium.EllipseGraphics({ semiMajorAxis: a, semiMinorAxis: b, height: hh, material: mat, fill: this.fill, outline: !!this._outlineEnabled, outlineColor: oc, outlineWidth: this._outlineWidth, rotation: (this.rotationAngle || 0) + (this._spinAngle || 0), extrudedHeight: computedExtrudedHeight, heightReference: hr });
            if (e.polygon) {
                e.polygon.hierarchy = new Cesium.CallbackProperty(() => {
                    return new Cesium.PolygonHierarchy([]);
@@ -635,7 +653,8 @@ export class CircleEntity extends SmartGeometryEntity {
              }
              e.ellipse.rotation = a3;
            }
-           e.ellipse.extrudedHeight = this.extrudedHeight;
+           e.ellipse.extrudedHeight = computedExtrudedHeight;
+           e.ellipse.extrudedHeightReference = this.extrudedHeightReference;
            e.ellipse.heightReference = hr;
        }
     }

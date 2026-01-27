@@ -63,17 +63,66 @@ export function styleInput(input) {
   return input;
 }
 
+export function getColorAlpha(color) {
+  if (!color) return 1;
+  
+  if (typeof color === 'object' && typeof color.alpha === 'number') {
+    return color.alpha;
+  }
+  
+  if (typeof color !== 'string') return 1;
+
+  const lower = color.toLowerCase();
+  if (lower.startsWith('rgba')) {
+    const match = lower.match(/rgba\s*\(\s*[0-9]+\s*,\s*[0-9]+\s*,\s*[0-9]+\s*,\s*([0-9.]+)\s*\)/);
+    if (match) {
+      return parseFloat(match[1]);
+    }
+  }
+  return 1;
+}
+
 export function colorToHex(color) {
   if (!color) return '#000000';
+  
+  // Handle Cesium.Color object or similar with toCssColorString
+  if (typeof color === 'object' && typeof color.toCssColorString === 'function') {
+    return colorToHex(color.toCssColorString());
+  }
+  
+  if (typeof color !== 'string') return '#000000';
+
   if (color.startsWith('#')) {
     if (color.length === 4) {
       return '#' + color[1] + color[1] + color[2] + color[2] + color[3] + color[3];
     }
     return color;
   }
+  const lower = color.toLowerCase();
+  if (lower.startsWith('rgb')) {
+    const match = lower.match(/rgba?\s*\(\s*([0-9]+)\s*,\s*([0-9]+)\s*,\s*([0-9]+)(?:\s*,\s*([0-9.]+))?\s*\)/);
+    if (match) {
+      const r = Math.max(0, Math.min(255, parseInt(match[1], 10)));
+      const g = Math.max(0, Math.min(255, parseInt(match[2], 10)));
+      const b = Math.max(0, Math.min(255, parseInt(match[3], 10)));
+      const toHex = (v) => v.toString(16).padStart(2, '0');
+      return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+    }
+  }
   const ctx = document.createElement('canvas').getContext('2d');
   ctx.fillStyle = color;
-  return ctx.fillStyle;
+  const v = ctx.fillStyle;
+  if (typeof v === 'string' && v.toLowerCase().startsWith('rgb')) {
+    const m = v.toLowerCase().match(/rgba?\s*\(\s*([0-9]+)\s*,\s*([0-9]+)\s*,\s*([0-9]+)(?:\s*,\s*([0-9.]+))?\s*\)/);
+    if (m) {
+      const r = Math.max(0, Math.min(255, parseInt(m[1], 10)));
+      const g = Math.max(0, Math.min(255, parseInt(m[2], 10)));
+      const b = Math.max(0, Math.min(255, parseInt(m[3], 10)));
+      const toHex = (v2) => v2.toString(16).padStart(2, '0');
+      return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+    }
+  }
+  return v || '#000000';
 }
 
 const translations = {
@@ -166,6 +215,29 @@ const translations = {
     text: '文本',
     saveState: '保存状态',
     restoreState: '恢复状态',
+    // New Additions
+    addPoint: '添加点',
+    add2DGeo: '添加2D几何',
+    addLinesAndWalls: '添加线/墙/走廊',
+    add3DGeo: '添加3D几何',
+    circle: '圆形',
+    ellipse: '椭圆',
+    rectangle: '矩形',
+    polygon: '多边形',
+    polyline: '线',
+    polylineVolume: '折线体',
+    corridor: '走廊',
+    wall: '墙',
+    box: '盒子',
+    sphere: '球体',
+    cylinder: '圆柱',
+    cone: '圆锥',
+    ellipsoid: '椭球',
+    extrudedHeight: '挤出高度',
+    topRadius: '顶半径',
+    bottomRadius: '底半径',
+    groundHeight: '离地高度',
+    rotationAxis: '旋转轴'
   },
   en: {
     title: 'Debugger',
@@ -256,6 +328,29 @@ const translations = {
     text: 'Text',
     saveState: 'Save State',
     restoreState: 'Restore State',
+    // New Additions
+    addPoint: 'Add Point',
+    add2DGeo: 'Add 2D Geo',
+    addLinesAndWalls: 'Add Lines/Walls',
+    add3DGeo: 'Add 3D Geo',
+    circle: 'Circle',
+    ellipse: 'Ellipse',
+    rectangle: 'Rectangle',
+    polygon: 'Polygon',
+    polyline: 'Polyline',
+    polylineVolume: 'Polyline Volume',
+    corridor: 'Corridor',
+    wall: 'Wall',
+    box: 'Box',
+    sphere: 'Sphere',
+    cylinder: 'Cylinder',
+    cone: 'Cone',
+    ellipsoid: 'Ellipsoid',
+    extrudedHeight: 'Extruded Height',
+    topRadius: 'Top Radius',
+    bottomRadius: 'Bottom Radius',
+    groundHeight: 'Ground Height',
+    rotationAxis: 'Rotation Axis'
   }
 };
 

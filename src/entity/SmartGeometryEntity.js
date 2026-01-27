@@ -21,6 +21,7 @@ export class SmartGeometryEntity extends GeometryEntity {
     this._spinAngle = 0;
     this._spinAxis = 'Z';
     this.extrudedHeight = o.extrudedHeight;
+    this.extrudedHeightReference = o.extrudedHeightReference;
     this.radiusValue = o.radius || 1000;
     this.semiMajorAxis = o.semiMajorAxis;
     this.semiMinorAxis = o.semiMinorAxis;
@@ -47,6 +48,133 @@ export class SmartGeometryEntity extends GeometryEntity {
     this.sectorSweepAngle = o.sectorSweepAngle;
     this.sectorVerticalAngle = o.sectorVerticalAngle;
     this.sectorSamples = o.sectorSamples || 64;
+  }
+
+  getCenter() {
+    const Cesium = this.cesium;
+    if (!Cesium) return null;
+
+    let result = null;
+    const k = (this.kind || '').toLowerCase();
+
+    // Helper to finalize height (apply offset, heightReference, and extrusion)
+    const finalizeResult = (baseRes) => {
+        if (!baseRes) return null;
+        
+        let alt = baseRes.alt;
+        const hr = this.heightReference;
+        const offset = this.heightOffset || 0;
+
+        // 1. Apply Height Reference & Offset (Base Height)
+        if (hr === 'relativeToGround' || hr === 'clampToGround') {
+            const terrainH = this._terrainHeight || this._getGroundHeight(baseRes.lng, baseRes.lat);
+            if (hr === 'clampToGround') {
+                alt = terrainH; // Ignore original Z, snap to ground
+            } else {
+                alt = terrainH + offset; // Ground + Offset
+            }
+        } else {
+            // Absolute: Base Z + Offset
+            alt = alt + offset;
+        }
+
+        // 2. Apply Extrusion (Volume Center)
+        // Only apply if the geometry type supports extrusion AND acts as a bottom-anchored shape.
+        // Supported types for extrudedHeight: polygon, circle, ellipse, rectangle, corridor.
+        // Polyline, Wall, PolylineVolume do not use extrudedHeight property in this implementation.
+        // Native 3D shapes (Box, Cylinder, Ellipsoid) are centered.
+        
+        const supportedExtrusionTypes = ['polygon', 'circle', 'ellipse', 'rectangle', 'corridor'];
+        const isSupported = supportedExtrusionTypes.includes(k);
+        
+        // Circle/Ellipse in 3D mode are Ellipsoids (Centered), so no fix needed.
+        const isNative3DMode = (k === 'circle' || k === 'ellipse') && this.modeDim === '3d';
+        
+        if (isSupported && !isNative3DMode && this.extrudedHeight) {
+            alt += this.extrudedHeight / 2;
+        }
+
+        return { ...baseRes, alt };
+    };
+
+    const computeCentroid = (positions) => {
+        if (!positions || !Array.isArray(positions) || positions.length === 0) return null;
+        let x = 0, y = 0, z = 0;
+        let count = 0;
+        
+        for (let i = 0; i < positions.length; i++) {
+             const p = positions[i];
+             if (p instanceof Cesium.Cartesian3) {
+                 x += p.x; y += p.y; z += p.z;
+                 count++;
+             }
+        }
+        
+        if (count === 0) return null;
+        const center = new Cesium.Cartesian3(x/count, y/count, z/count);
+        const carto = Cesium.Cartographic.fromCartesian(center);
+        return {
+            lng: Cesium.Math.toDegrees(carto.longitude),
+            lat: Cesium.Math.toDegrees(carto.latitude),
+            alt: carto.height // This is the average altitude of vertices
+        };
+    };
+
+    // 1. Shapes defined by positions array
+    if (['polyline', 'wall', 'corridor', 'polylineVolume'].includes(k)) {
+        let data = null;
+        if (k === 'wall') data = this.wallPositionsData;
+        else if (k === 'corridor') data = this.corridorPositionsData;
+        else data = this.polylinePositionsData; // polyline and polylineVolume
+
+        if (data) {
+             // Normalize to Cartesian3[]
+             let positions = this._normalizePositions(data);
+             // Apply rotation if any
+             positions = this._rotatePositions(positions);
+             
+             if (positions && positions.length > 0) {
+                 result = computeCentroid(positions);
+             }
+        }
+    }
+    
+    // 2. Shapes defined by polygon hierarchy
+    else if (k === 'polygon' && this.polygonHierarchyData) {
+        // Normalize hierarchy (returns Cartesian3[] or PolygonHierarchy)
+        let h = this._normalizeHierarchy(this.polygonHierarchyData);
+        let positions = (h instanceof Cesium.PolygonHierarchy) ? h.positions : h;
+        
+        if (Array.isArray(positions)) {
+            // Apply rotation
+            positions = this._rotatePositions(positions);
+            result = computeCentroid(positions);
+        }
+    }
+
+    // 3. Rectangle
+    else if (k === 'rectangle' && this.rectangleCoordinates) {
+        const rect = this.rectangleCoordinates;
+        if (rect instanceof Cesium.Rectangle) {
+             const c = Cesium.Rectangle.center(rect);
+             result = {
+                 lng: Cesium.Math.toDegrees(c.longitude),
+                 lat: Cesium.Math.toDegrees(c.latitude),
+                 alt: 0 
+             };
+        }
+    }
+
+    // 4. Default: Single position (Circle, Ellipse, Box, etc.)
+    else if (this.position && this.position.length >= 2) {
+         result = {
+             lng: this.position[0],
+             lat: this.position[1],
+             alt: this.position[2] || 0
+         };
+    }
+    
+    return finalizeResult(result);
   }
 
   getCollection() {
@@ -212,6 +340,7 @@ export class SmartGeometryEntity extends GeometryEntity {
   dimensions(x, y, z) { this.dimX = x; this.dimY = y; this.dimZ = z; this.trigger('change', this); return this; }
   dim(x, y, z) { return this.dimensions(x, y, z); }
   polylinePositions(p) { this.polylinePositionsData = p; this.trigger('change', this); return this; }
+  width(w) { this.polylineWidth = w; this.trigger('change', this); return this; }
   volumeShape(s) { this.volumeShapeData = s; this.trigger('change', this); return this; }
   corridorPositions(p) { this.corridorPositionsData = p; this.trigger('change', this); return this; }
   corridorWidthSet(w) { this.corridorWidth = w; this.trigger('change', this); return this; }
@@ -698,7 +827,16 @@ export class SmartGeometryEntity extends GeometryEntity {
           e.polygon.height = undefined;
       }
     }
-    if (this.extrudedHeight !== undefined) e.polygon.extrudedHeight = this.extrudedHeight;
+    if (this.extrudedHeight !== undefined) {
+        const hh2 = this._effectiveHeight();
+        const hr = this._getHeightReferenceEnum();
+        let finalExt = this.extrudedHeight;
+        // [Fix] Interpret extrudedHeight as thickness
+        if (hr !== Cesium.HeightReference.CLAMP_TO_GROUND) {
+            finalExt += hh2;
+        }
+        e.polygon.extrudedHeight = finalExt;
+    }
       if (mat) e.polygon.material = mat;
       e.polygon.outline = !!this._outlineEnabled;
       if (oc) e.polygon.outlineColor = oc;
