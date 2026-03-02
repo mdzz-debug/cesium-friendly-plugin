@@ -1,8 +1,4 @@
-/**
- * Vue integration entry point
- * Exports Vue plugin and components
- */
+import VuePlugin from './vue/plugin.js';
 
-export { default as VuePlugin } from './vue-plugin.js';
-export { Vue2Component, Vue3Component, getVueComponent } from './vue-component.js';
-
+export default VuePlugin;
+export { VuePlugin };

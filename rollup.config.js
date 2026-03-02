@@ -1,31 +1,14 @@
 import resolve from '@rollup/plugin-node-resolve';
 import commonjs from '@rollup/plugin-commonjs';
-import terser from '@rollup/plugin-terser';
-import fs from 'fs';
-import path from 'path';
+import { terser } from 'rollup-plugin-terser';
 
-const shouldMinify = !process.env.ROLLUP_WATCH;
-
-const copyAssets = () => ({
-  name: 'copy-assets',
-  writeBundle() {
-    try {
-      const srcDir = path.resolve('src/assets/material');
-      const distDir = path.resolve('dist/assets/material');
-      fs.mkdirSync(distDir, { recursive: true });
-      const files = ['waterNormals.jpg', 'material.png'];
-      files.forEach((f) => {
-        const src = path.join(srcDir, f);
-        if (fs.existsSync(src)) {
-          fs.copyFileSync(src, path.join(distDir, f));
-        }
-      });
-    } catch (_) {}
-  }
-});
+const plugins = [
+  resolve({ browser: true }),
+  commonjs(),
+  terser()
+];
 
 export default [
-  // Main entry
   {
     input: 'src/index.js',
     output: [
@@ -33,59 +16,47 @@ export default [
         file: 'dist/index.js',
         format: 'cjs',
         name: 'CesiumFriendlyPlugin',
-        exports: 'named'
+        exports: 'named',
+        sourcemap: true
       },
       {
         file: 'dist/index.esm.js',
         format: 'es',
-        name: 'CesiumFriendlyPlugin'
+        name: 'CesiumFriendlyPlugin',
+        sourcemap: true
       },
       {
         file: 'dist/index.umd.js',
         format: 'umd',
-        name: 'CesiumFriendlyPlugin'
-        // UMD will expose named exports under the global name
+        name: 'CesiumFriendlyPlugin',
+        exports: 'named',
+        globals: {
+          cesium: 'Cesium',
+          vue: 'Vue'
+        },
+        sourcemap: true
       }
     ],
-    plugins: [
-      resolve({
-        browser: true
-      }),
-      commonjs(),
-      shouldMinify ? terser({
-        keep_classnames: true,
-        keep_fnames: true
-      }) : null,
-      copyAssets()
-    ].filter(Boolean),
-    external: ['cesium']
+    plugins,
+    external: ['cesium', 'vue']
   },
-  // Vue entry
   {
     input: 'src/vue.js',
     output: [
       {
         file: 'dist/vue.js',
         format: 'cjs',
-        exports: 'named'
+        exports: 'named',
+        sourcemap: true
       },
       {
         file: 'dist/vue.esm.js',
         format: 'es',
-        exports: 'named'
+        exports: 'named',
+        sourcemap: true
       }
     ],
-    plugins: [
-      resolve({
-        browser: true
-      }),
-      commonjs(),
-      shouldMinify ? terser({
-        keep_classnames: true,
-        keep_fnames: true
-      }) : null,
-      copyAssets()
-    ].filter(Boolean),
-    external: ['cesium']
+    plugins,
+    external: ['cesium', 'vue']
   }
 ];

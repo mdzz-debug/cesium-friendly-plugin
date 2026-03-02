@@ -1,163 +1,171 @@
 # Cesium Friendly Plugin
 
-![Version](https://img.shields.io/badge/version-1.0.2-blue.svg)
-<!-- [![GitHub](https://img.shields.io/badge/GitHub-Repo-black?logo=github)](https://github.com/mdzz-debug/cesium-friendly-plugin) -->
+`cesium-friendly-plugin` 是一个面向业务开发的 Cesium 封装库，提供统一、语义化、可链式的 API，覆盖点位、广告牌、标签、组合实体、几何实体、模型、材质与数据加载等常见场景。
 
-Cesium 开发伴侣，提供一套友好的链式调用 API，简化 Cesium 原生繁琐的实体管理、事件绑定和交互逻辑。
+- 官网: [http://cf.luohao.online/](http://cf.luohao.online/)
+- 包名: `cesium-friendly-plugin`
+- 当前主版本: `2.0.0`
+- License: `MIT`
 
-> **版本 v1.0.2 更新**: 新增 **文字 (Label)** 系统及配套调试面板；增强 **调试器 (Debugger)** 体验，新增 SVG 引导连接线；修复贴地模式下的显示问题。
+## 1. 核心特性
 
-## 特性
+- 链式 API 与 Object API 双模式，适配不同团队编码习惯
+- 统一事件系统（click/hover/select/drag）与交互反馈
+- 动画系统（from/to、easing、loop/yoyo、onUpdate/onComplete）
+- 几何能力（circle/rectangle/path/box/cylinder/cone）与扩展几何模式
+- 材质系统（solid/flow/water/pulse/radar）及 uniforms 动画
+- 数据加载能力（GeoJSON）并预留 GeoServer 扩展入口
+- Vue 2 / Vue 3 插件化集成
 
-- **链式调用**：`cf.billboard.add(...).setScale(1.5).on('click', ...)`，代码更优雅。
-- **自动管理**：内置实体管理器，支持批量操作、分组管理、自动清理。
-- **高级交互**：
-  - **事件**：Click, Hover, Select, Drag (拖拽) 等。
-  - **状态**：自动管理选中/非选中状态恢复，无需手动重置样式。
-  - **特效**：呼吸灯闪烁、自动贴地/相对高度模式切换。
-- **Vue 集成**：提供开箱即用的 Vue 2/3 插件和组件。
-
-## API 概览
-
-插件提供了**类型专用**的命名空间方法和**全局通用**的方法。
-
-### 1. 类型专用 API (推荐)
-
-命名空间下的方法会自动过滤实体类型，避免误操作。
-
-| 命名空间 | 方法示例 | 说明 |
-| :--- | :--- | :--- |
-| **`cf.billboard`** | `add`, `get`, `remove` | 仅操作**广告牌** |
-| **`cf.label`** | `add`, `get`, `remove` | 仅操作**文字** |
-| **`cf.point`** | `add`, `get`, `remove` | 仅操作**点位** |
-
-**示例**：
-```javascript
-// 仅获取所有广告牌（不含点位）
-const billboards = cf.billboard.getAll(); 
-
-// 仅移除点位类型的 id（如果该 id 是广告牌，则忽略）
-cf.point.remove('some-id'); 
-```
-
-### 2. 全局通用 API
-
-用于跨类型的混合操作。
-
-| 方法 | 说明 |
-| :--- | :--- |
-| **`cf.get(id)`** | 获取任意类型的实体实例 |
-| **`cf.getAll()`** | 获取所有实体 |
-| **`cf.remove(id)`** | 移除指定 ID 的实体 |
-| **`cf.removeAll()`** | 清空所有实体 |
-| **`cf.removeGroup(name)`** | 移除指定分组的所有实体 |
-| **`cf.select(id)`** | 选中指定实体 |
-| **`cf.deselect()`** | 取消当前选中 |
-
-## 安装
+## 2. 安装
 
 ```bash
-npm install cesium-friendly-plugin
+npm i cesium-friendly-plugin cesium
 ```
 
-## 快速开始
+## 3. 快速开始
 
-### 1. 引入并初始化
+### 3.1 Vue 3
 
-```javascript
-import * as Cesium from 'cesium';
-import cf from 'cesium-friendly-plugin';
+```js
+import { createApp } from 'vue'
+import App from './App.vue'
+import CesiumFriendly from 'cesium-friendly-plugin'
 
-// 假设你已经创建了 viewer
-const viewer = new Cesium.Viewer('cesiumContainer');
-
-// 初始化插件
-cf.init(Cesium, viewer);
+const app = createApp(App)
+app.use(CesiumFriendly)
+app.mount('#app')
 ```
 
-### 2. 添加广告牌 (Billboard)
+```vue
+<script setup>
+import { inject, onMounted, ref } from 'vue'
+import * as Cesium from 'cesium'
 
-```javascript
-cf.billboard.add({
-  position: [116.3974, 39.9093],
-  imageUrl: '/icons/car.png',
-  scale: 1.2,
-  draggable: true // 开启拖拽
-}).on('click', (b) => {
-  console.log('点击了车:', b.id);
-  b.setFlash(true); // 开启闪烁
-}).on('dragend', (b) => {
-  console.log('车辆新位置:', b.position);
-});
+const el = ref(null)
+const cf = inject('cf')
+
+onMounted(() => {
+  const viewer = new Cesium.Viewer(el.value)
+  cf.init(viewer, Cesium)
+})
+</script>
 ```
 
-### 3. 添加点位 (Point)
+### 3.2 原生 JS
 
-```javascript
-cf.point.add([116.40, 39.91])
-  .setColor('red')
-  .setPixelSize(15)
-  .setHeight(100) // 离地 100米
-  .setOutline(true, 'white', 2)
-  .on('hover', (p, isHover) => {
-    p.setPixelSize(isHover ? 20 : 15);
-  });
+```js
+import * as Cesium from 'cesium'
+import CesiumFriendly from 'cesium-friendly-plugin'
+
+const viewer = new Cesium.Viewer('map')
+const cf = new CesiumFriendly(viewer, Cesium)
 ```
 
-### 4. 添加文字 (Label)
+## 4. 基础用法
 
-```javascript
-cf.label.add({
-  position: [116.405, 39.905],
-  text: 'Cesium Friendly',
-  fontSize: 24,
-  color: '#FFFFFF',
-  backgroundColor: 'rgba(0,0,0,0.5)'
-}).setHeight(200) // 设置高度
-  .setDisableDepthTestDistance(true) // 开启置顶（不被遮挡）
-  .on('click', (l) => {
-    console.log('点击了文字:', l.text);
-  });
+```js
+cf.point({ id: 'p1', position: [116.39, 39.9] })
+  .setColor('#00e5ff')
+  .setSize(12)
+  .on('click', (e) => console.log(e.id))
+  .add()
+  .flyTo({ range: 240000, duration: 1.8 })
 ```
 
-### 5. 实体组合与导出 (toCanvas)
-
-详细文档请参考 [GlobalMethods.md](./src/doc/GlobalMethods.md#实体组合与导出-tocanvas)。
-
-支持将多个实体（点、图标、文字）组合并渲染为一张 Canvas 图片，常用于高性能聚合或复杂图标生成。
-
-```javascript
-// 示例：生成 2x 高清组合图
-cf.point({...}).label({...}).toCanvas(2).add();
+```js
+cf.create({
+  type: 'billboard',
+  id: 'bb1',
+  position: [116.4, 39.91, 0],
+  image: '/icon.png',
+  scale: 1.2
+}).add()
 ```
 
-## 功能模块文档
+## 5. API 概览
 
-- [🖼️ 广告牌 (Billboard) API 文档](./src/doc/BillboardMethods.md)
-- [📝 文字 (Label) API 文档](./src/doc/LabelMethods.md)
-- [📍 点位 (Point) API 文档](./src/doc/PointMethods.md)
-  - 基础点位、样式设置、有效期（TTL）、批量管理。
+### 5.1 工厂入口
 
-## Vue 集成
+- `cf.create(options)`
+- `cf.point / cf.billboard / cf.label / cf.canvas`
+- `cf.circle / cf.rectangle / cf.path / cf.box / cf.cylinder / cf.cone / cf.model`
 
-插件会自动识别 Vue 版本（2.x 或 3.x）并注册。
+### 5.2 全局管理
 
-```javascript
-// main.js
-import cf from 'cesium-friendly-plugin';
-app.use(cf);
+- `cf.get(id)` / `cf.getAll()` / `cf.getByGroup(group)`
+- `cf.removeGroup(group)` / `cf.removeAll()`
+- `cf.queryInfo(query, options?)` / `cf.removeByQuery(query, options?)`
+- `cf.loadGeoJSON(input, options?)`
+- `cf.loadData(type, input, options?)`
+- `cf.registerDataProvider(type, loader)`
 
-// 组件中
-this.$cf.billboard.add(...);
+### 5.3 常用公共链式方法
+
+- `add() / remove() / destroy() / update()`
+- `show() / hide() / setVisible(boolean)`
+- `setPosition(...) / setOpacity(alpha)`
+- `setVisibleRange({ near, far })`
+- `setScaleByDistance(...)`（点/广告牌/标签/模型）
+- `setTranslucencyByDistance(...)`（点/广告牌/标签/模型）
+- `setDepthTest(boolean)` / `setDisableDepthTestDistance(distance)`
+- `flyTo({ range, height, duration, heading, pitch, orientation })`
+- `on(type, handler) / off(type, handler)`
+
+## 6. 动画系统
+
+```js
+entity.animate({
+  from: { opacity: 1 },
+  to: { opacity: 0.3, pixelSize: 20 },
+  duration: 1.6,
+  yoyo: true,
+  loop: true,
+  easing: 'easeInOutCubic',
+  onUpdate: (e, state, progress) => {},
+  onComplete: (e) => {}
+})
 ```
 
-## 构建
+- 统一使用 `onUpdate` 作为过程回调
+- `onComplete` 仅在非无限循环场景有意义
+
+## 7. 材质系统
+
+```js
+cf.rectangle({
+  coordinates: [112.0, 30.0, 112.6, 30.4],
+  height: 80000
+})
+  .setMaterial({ type: 'water', color: '#2f7fd3', opacity: 0.85 })
+  .add()
+```
+
+支持材质类型：
+
+- `solid`
+- `flow`
+- `water`
+- `pulse`
+- `radar`
+
+支持 uniforms 动画（`animate({ to: { material: { uniforms: ... } } })`）。
+
+## 8. 版本说明（2.0）
+
+`2.0.0` 为主版本升级，核心方向：
+
+- 完整链式 API 体系升级
+- 几何与材质系统能力增强
+- GeoJSON 数据能力与扩展口完善
+- 文档与 Demo 体系重构
+
+## 9. 开发与构建
 
 ```bash
 npm install
 npm run build
 ```
 
-## License
+发布前会自动执行 `prepublishOnly` 构建。
 
-MIT
